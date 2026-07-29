@@ -321,14 +321,19 @@
 
         <!-- Navigation Links -->
         <div class="nav-links">
-            <a href="/" class="nav-link">Home</a> | 
-            <a href="/admin" class="nav-link">Admin Panel</a> | 
-            <a href="/billboard" class="nav-link">Billboard</a>
+            <a href="/" class="nav-link">Home</a> |
+            <a href="/admin" class="nav-link">Admin Panel</a> |
+            <a href="/billboard" class="nav-link">Billboard</a> |
+            <a href="/design-billboard" class="nav-link">Vote Showcase</a> |
+            <a href="/vote" class="nav-link">Vote</a>
         </div>
 
         <div class="tab">
             <button class="tablinks active" onclick="openTab(event, 'contestants')">Contestants</button>
             <button class="tablinks" onclick="openTab(event, 'test-results')">Test Results</button>
+            <button class="tablinks" onclick="openTab(event, 'billboard-settings')">Billboard</button>
+            <button class="tablinks" onclick="openTab(event, 'voting'); loadVotes()">Voting</button>
+            <button class="tablinks" onclick="openTab(event, 'classes')">Classes</button>
         </div>
 
         <div id="contestants" class="tabcontent" style="display: block;">
@@ -346,7 +351,9 @@
                 <thead>
                     <tr>
                         <th>ID</th>
+                        <th>Photo</th>
                         <th>Name</th>
+                        <th>Class</th>
                         <th>Phone</th>
                         <th>Email</th>
                         <th>Notes</th>
@@ -358,19 +365,21 @@
                     {% for contestant in contestants %}
                     <tr>
                         <td>{{ contestant.id }}</td>
+                        <td>
+                            {% if contestant.photo_path %}
+                                <img src="{{ url_for('static', filename=contestant.photo_path) }}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;">
+                            {% else %}
+                                &mdash;
+                            {% endif %}
+                        </td>
                         <td>{{ contestant.name }}</td>
+                        <td style="color:#888; font-size:0.85rem;">{{ contestant.class_name or '—' }}</td>
                         <td>{{ contestant.phone_number }}</td>
                         <td>{{ contestant.email }}</td>
                         <td>{{ contestant.notes }}</td>
                         <td>{{ contestant.created }}</td>
                         <td>
-                            <button class="edit-btn" onclick="showEditContestantModal({
-                                id: {{ contestant.id }}, 
-                                name: '{{ contestant.name }}', 
-                                phone_number: '{{ contestant.phone_number | default('', true) }}', 
-                                email: '{{ contestant.email | default('', true) }}', 
-                                notes: '{{ contestant.notes | default('', true) | replace("'", "\\'") }}'
-                            })">Edit</button>
+                            <button class="edit-btn" onclick='showEditContestantModal({{ contestant | tojson }})'>Edit</button>
                             <button class="delete-btn" onclick="deleteContestant({{ contestant.id }})">Delete</button>
                         </td>
                     </tr>
@@ -381,7 +390,10 @@
 
         <div id="test-results" class="tabcontent">
             <h2>Test Results</h2>
-            <button onclick="showAddTestResultModal()">Add New Test Result</button>
+            <div style="display:flex; gap:10px; flex-wrap:wrap; margin-bottom:12px;">
+                <button onclick="showAddTestResultModal()">Add New Test Result</button>
+                <a href="/admin/export/test-results" style="text-decoration:none; padding:7px 14px; background:#2196F3; color:#fff; border-radius:4px; font-size:0.9rem;">⬇ Export CSV</a>
+            </div>
             <table id="test-results-table">
                 <thead>
                     <tr>
@@ -419,12 +431,43 @@
             </table>
         </div>
 
+        <div id="billboard-settings" class="tabcontent">
+            <h2>Billboard Display</h2>
+            <p>Toggle which sections appear on the live billboard. Changes apply within 15 seconds.</p>
+            <div class="form-group">
+                <label><input type="checkbox" id="show_classic"> Classic Hat Leaderboard</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="show_hybrid"> Hybrid Hat Leaderboard</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="show_spectrum"> Spectrum Analyzer / Recent Test</label>
+            </div>
+            <div class="form-group">
+                <label><input type="checkbox" id="show_votes"> Popular Vote Panel (on RF billboard)</label>
+            </div>
+            <hr style="margin: 15px 0; border-color: var(--table-border);">
+            <h3 style="margin-bottom:10px;">Vote Showcase Billboard</h3>
+            <div class="form-group">
+                <label><input type="checkbox" id="vote_show_labels"> Show name &amp; vote count on photos</label>
+                <small style="display:block; margin-top:4px; color:#888;">Off = images only. Page refreshes every 30s to pick up changes.</small>
+            </div>
+            <button onclick="saveBillboardConfig()" style="margin-top:10px;">Save</button>
+            <div id="billboard-save-msg" style="display:none; margin-top:10px; color: var(--success-text); background: var(--success-background); padding: 8px; border-radius:4px;">Settings saved.</div>
+            <hr style="margin: 20px 0; border-color: var(--table-border);">
+            <h3>Quick Links</h3>
+            <p>
+                <a href="/billboard" target="_blank" class="nav-link">RF Competition Billboard</a> &nbsp;|&nbsp;
+                <a href="/design-billboard" target="_blank" class="nav-link">Vote Showcase Billboard</a>
+            </p>
+        </div>
+
         <!-- Add Contestant Modal -->
         <div id="add-contestant-modal" class="modal">
             <div class="modal-content">
                 <span class="close" onclick="closeAddContestantModal()">&times;</span>
                 <h2>Add New Contestant</h2>
-                <form id="add-contestant-form" onsubmit="addContestant(event)">
+                <form id="add-contestant-form" onsubmit="addContestant(event)" enctype="multipart/form-data">
                     <div class="form-group">
                         <label for="name">Name:</label>
                         <input type="text" id="name" name="name" required>
@@ -441,7 +484,133 @@
                         <label for="notes">Notes:</label>
                         <textarea id="notes" name="notes"></textarea>
                     </div>
+                    <div class="form-group">
+                        <label for="add_class_id">Class / Category:</label>
+                        <select id="add_class_id" name="class_id">
+                            <option value="">— None —</option>
+                            {% for cls in classes %}
+                            <option value="{{ cls.id }}">{{ cls.name }}{% if cls.is_team %} (Team){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Hat Photo (optional):</label>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <input type="file" id="add-photo" name="photo" accept="image/*" style="flex:1;">
+                            <button type="button" id="add-webcam-btn" style="white-space:nowrap;">📷 Use Webcam</button>
+                        </div>
+                        <div id="add-webcam-panel" style="margin-top:8px;">
+                            <video id="add-video" autoplay playsinline style="display:none;max-width:100%;border-radius:4px;"></video>
+                            <canvas id="add-canvas" style="display:none;"></canvas>
+                            <img id="add-preview" style="display:none;max-width:100%;border-radius:4px;" alt="Captured photo">
+                            <div style="margin-top:6px;display:flex;gap:6px;">
+                                <button type="button" id="add-snap-btn"   style="display:none;">Snap</button>
+                                <button type="button" id="add-retake-btn" style="display:none;">Retake</button>
+                                <button type="button" id="add-cancel-btn" style="display:none;background:#888;">Cancel</button>
+                            </div>
+                        </div>
+                    </div>
                     <input type="submit" value="Add Contestant">
+                </form>
+            </div>
+        </div>
+
+        <div id="voting" class="tabcontent">
+            <h2>Vote Tallies</h2>
+            <p style="margin-bottom:12px;">
+                <a href="/vote" target="_blank" class="nav-link">Open Voting Kiosk</a> &nbsp;|&nbsp;
+                <a href="/design-billboard" target="_blank" class="nav-link">Vote Showcase</a>
+            </p>
+            <div style="margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap;">
+                <a href="/admin/export/csv" class="btn" style="text-decoration:none; padding:7px 14px; background:#2196F3; color:#fff; border-radius:4px; font-size:0.9rem;">⬇ Export CSV</a>
+                <a href="/admin/export/images" class="btn" style="text-decoration:none; padding:7px 14px; background:#4CAF50; color:#fff; border-radius:4px; font-size:0.9rem;">⬇ Export Photos ZIP</a>
+            </div>
+            <div id="votes-loading" style="color:#888;">Loading…</div>
+            <table id="votes-table" style="display:none; width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left; padding:8px; border-bottom:2px solid var(--table-border);">Photo</th>
+                        <th style="text-align:left; padding:8px; border-bottom:2px solid var(--table-border);">Name</th>
+                        <th style="text-align:center; padding:8px; border-bottom:2px solid var(--table-border);">Votes</th>
+                        <th style="text-align:left; padding:8px; border-bottom:2px solid var(--table-border);">Last Vote</th>
+                    </tr>
+                </thead>
+                <tbody id="votes-tbody"></tbody>
+            </table>
+        </div>
+
+        <div id="classes" class="tabcontent">
+            <h2>Classes / Categories</h2>
+            <p style="margin-bottom:12px; color:#888;">Classes group contestants into categories (e.g. Open, Beginner, Team). Each class can optionally be flagged as a Team.</p>
+            <button onclick="showAddClassModal()" style="margin-bottom:16px;">+ Add Class</button>
+            <table style="width:100%; border-collapse:collapse;">
+                <thead>
+                    <tr>
+                        <th style="text-align:left; padding:8px; border-bottom:2px solid var(--table-border);">Name</th>
+                        <th style="text-align:left; padding:8px; border-bottom:2px solid var(--table-border);">Description</th>
+                        <th style="text-align:center; padding:8px; border-bottom:2px solid var(--table-border);">Team?</th>
+                        <th style="padding:8px; border-bottom:2px solid var(--table-border);"></th>
+                    </tr>
+                </thead>
+                <tbody id="classes-tbody">
+                    {% for cls in classes %}
+                    <tr id="class-row-{{ cls.id }}">
+                        <td style="padding:8px; border-bottom:1px solid var(--table-border);">{{ cls.name }}</td>
+                        <td style="padding:8px; border-bottom:1px solid var(--table-border); color:#888;">{{ cls.description or '—' }}</td>
+                        <td style="padding:8px; border-bottom:1px solid var(--table-border); text-align:center;">{{ 'Yes' if cls.is_team else 'No' }}</td>
+                        <td style="padding:8px; border-bottom:1px solid var(--table-border);">
+                            <button class="edit-btn" onclick='showEditClassModal({{ cls | tojson }})' style="margin-right:4px;">Edit</button>
+                            <button class="delete-btn" onclick="deleteClass({{ cls.id }}, this)">Delete</button>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr id="classes-empty"><td colspan="4" style="padding:20px; text-align:center; color:#888;">No classes defined yet.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Add Class Modal -->
+        <div id="add-class-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeAddClassModal()">&times;</span>
+                <h2>Add Class</h2>
+                <form id="add-class-form" onsubmit="submitAddClass(event)">
+                    <div class="form-group">
+                        <label>Name:</label>
+                        <input type="text" id="add-class-name" name="name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description (optional):</label>
+                        <input type="text" id="add-class-desc" name="description">
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="add-class-team"> This is a Team class</label>
+                    </div>
+                    <input type="submit" value="Add Class">
+                </form>
+            </div>
+        </div>
+
+        <!-- Edit Class Modal -->
+        <div id="edit-class-modal" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeEditClassModal()">&times;</span>
+                <h2>Edit Class</h2>
+                <form id="edit-class-form" onsubmit="submitEditClass(event)">
+                    <input type="hidden" id="edit-class-id">
+                    <div class="form-group">
+                        <label>Name:</label>
+                        <input type="text" id="edit-class-name" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Description (optional):</label>
+                        <input type="text" id="edit-class-desc">
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="edit-class-team"> This is a Team class</label>
+                    </div>
+                    <input type="submit" value="Save Changes">
                 </form>
             </div>
         </div>
@@ -451,7 +620,7 @@
             <div class="modal-content">
                 <span class="close" onclick="closeEditContestantModal()">&times;</span>
                 <h2>Edit Contestant</h2>
-                <form id="edit-contestant-form" onsubmit="updateContestant(event)">
+                <form id="edit-contestant-form" onsubmit="updateContestant(event)" enctype="multipart/form-data">
                     <input type="hidden" id="edit_contestant_id" name="id">
                     <div class="form-group">
                         <label for="edit_name">Name:</label>
@@ -468,6 +637,35 @@
                     <div class="form-group">
                         <label for="edit_notes">Notes:</label>
                         <textarea id="edit_notes" name="notes"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label for="edit_class_id">Class / Category:</label>
+                        <select id="edit_class_id" name="class_id">
+                            <option value="">— None —</option>
+                            {% for cls in classes %}
+                            <option value="{{ cls.id }}">{{ cls.name }}{% if cls.is_team %} (Team){% endif %}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Hat Photo:</label>
+                        <div id="edit-current-photo" style="display:none; margin-bottom:8px;">
+                            <img id="edit-photo-preview" src="" alt="Current hat photo" style="width:80px;height:80px;object-fit:cover;border-radius:4px;">
+                        </div>
+                        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                            <input type="file" id="edit-photo" name="photo" accept="image/*" style="flex:1;">
+                            <button type="button" id="edit-webcam-btn" style="white-space:nowrap;">📷 Use Webcam</button>
+                        </div>
+                        <div style="margin-top:8px;">
+                            <video id="edit-video" autoplay playsinline style="display:none;max-width:100%;border-radius:4px;"></video>
+                            <canvas id="edit-canvas" style="display:none;"></canvas>
+                            <img id="edit-preview" style="display:none;max-width:100%;border-radius:4px;" alt="Captured photo">
+                            <div style="margin-top:6px;display:flex;gap:6px;">
+                                <button type="button" id="edit-snap-btn"   style="display:none;">Snap</button>
+                                <button type="button" id="edit-retake-btn" style="display:none;">Retake</button>
+                                <button type="button" id="edit-cancel-btn" style="display:none;background:#888;">Cancel</button>
+                            </div>
+                        </div>
                     </div>
                     <input type="submit" value="Update Contestant">
                 </form>
@@ -543,6 +741,7 @@
             </div>
         </div>
 
+        <script src="/static/js/webcam.js"></script>
         <script>
             // Dark mode toggle
             document.addEventListener('DOMContentLoaded', function() {
@@ -590,6 +789,7 @@
             }
 
             function closeAddContestantModal() {
+                addWebcam?.cancel();
                 document.getElementById('add-contestant-modal').style.display = 'none';
             }
 
@@ -599,10 +799,21 @@
                 document.getElementById('edit_phone_number').value = contestant.phone_number || '';
                 document.getElementById('edit_email').value = contestant.email || '';
                 document.getElementById('edit_notes').value = contestant.notes || '';
+                document.getElementById('edit_class_id').value = contestant.class_id || '';
+                document.getElementById('edit-photo').value = '';
+                const photoDiv = document.getElementById('edit-current-photo');
+                const photoImg = document.getElementById('edit-photo-preview');
+                if (contestant.photo_path) {
+                    photoImg.src = '/static/' + contestant.photo_path;
+                    photoDiv.style.display = 'block';
+                } else {
+                    photoDiv.style.display = 'none';
+                }
                 document.getElementById('edit-contestant-modal').style.display = 'block';
             }
 
             function closeEditContestantModal() {
+                editWebcam?.cancel();
                 document.getElementById('edit-contestant-modal').style.display = 'none';
             }
 
@@ -628,22 +839,42 @@
                 document.getElementById('edit-test-result-modal').style.display = 'none';
             }
 
+            // Webcam instances (init after DOM ready)
+            let addWebcam, editWebcam;
+            document.addEventListener('DOMContentLoaded', () => {
+                addWebcam = new WebcamCapture({
+                    videoEl:   document.getElementById('add-video'),
+                    canvasEl:  document.getElementById('add-canvas'),
+                    previewEl: document.getElementById('add-preview'),
+                    fileInput: document.getElementById('add-photo'),
+                    snapBtn:   document.getElementById('add-snap-btn'),
+                    retakeBtn: document.getElementById('add-retake-btn'),
+                    webcamBtn: document.getElementById('add-webcam-btn'),
+                    cancelBtn: document.getElementById('add-cancel-btn'),
+                });
+                editWebcam = new WebcamCapture({
+                    videoEl:   document.getElementById('edit-video'),
+                    canvasEl:  document.getElementById('edit-canvas'),
+                    previewEl: document.getElementById('edit-preview'),
+                    fileInput: document.getElementById('edit-photo'),
+                    snapBtn:   document.getElementById('edit-snap-btn'),
+                    retakeBtn: document.getElementById('edit-retake-btn'),
+                    webcamBtn: document.getElementById('edit-webcam-btn'),
+                    cancelBtn: document.getElementById('edit-cancel-btn'),
+                });
+            });
+
             // API Functions
             async function addContestant(event) {
                 event.preventDefault();
                 const form = document.getElementById('add-contestant-form');
-                const formData = new FormData(form);
-                
+                const fd = new FormData(form);
+                const blob = addWebcam?.getBlob();
+                if (blob) fd.set('photo', blob, 'webcam.jpg');
                 try {
-                    const response = await fetch('/admin/contestants', {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(Object.fromEntries(formData))
-                    });
-                    
+                    const response = await fetch('/admin/contestants', { method: 'POST', body: fd });
                     if (response.ok) {
+                        addWebcam?.reset();
                         closeAddContestantModal();
                         window.location.reload();
                     } else {
@@ -658,19 +889,14 @@
             async function updateContestant(event) {
                 event.preventDefault();
                 const form = document.getElementById('edit-contestant-form');
-                const formData = new FormData(form);
                 const id = document.getElementById('edit_contestant_id').value;
-                
+                const fd = new FormData(form);
+                const blob = editWebcam?.getBlob();
+                if (blob) fd.set('photo', blob, 'webcam.jpg');
                 try {
-                    const response = await fetch(`/admin/contestants/${id}`, {
-                        method: 'PUT',
-                        headers: {
-                            'Content-Type': 'application/json',
-                        },
-                        body: JSON.stringify(Object.fromEntries(formData))
-                    });
-                    
+                    const response = await fetch(`/admin/contestants/${id}`, { method: 'PUT', body: fd });
                     if (response.ok) {
+                        editWebcam?.reset();
                         closeEditContestantModal();
                         window.location.reload();
                     } else {
@@ -783,6 +1009,121 @@
                     console.error('Error:', error);
                     alert('Error deleting test result');
                 }
+            }
+
+            // Billboard config
+            async function loadBillboardConfig() {
+                try {
+                    const cfg = await fetch('/api/billboard-config').then(r => r.json());
+                    document.getElementById('show_classic').checked    = cfg.billboard_show_classic      !== false;
+                    document.getElementById('show_hybrid').checked     = cfg.billboard_show_hybrid       !== false;
+                    document.getElementById('show_spectrum').checked   = cfg.billboard_show_spectrum     !== false;
+                    document.getElementById('show_votes').checked      = cfg.billboard_show_votes        === true;
+                    document.getElementById('vote_show_labels').checked = cfg.billboard_vote_show_labels === true;
+                } catch (e) { console.error('billboard config load failed', e); }
+            }
+
+            async function saveBillboardConfig() {
+                const cfg = {
+                    billboard_show_classic:      document.getElementById('show_classic').checked,
+                    billboard_show_hybrid:       document.getElementById('show_hybrid').checked,
+                    billboard_show_spectrum:     document.getElementById('show_spectrum').checked,
+                    billboard_show_votes:        document.getElementById('show_votes').checked,
+                    billboard_vote_show_labels:  document.getElementById('vote_show_labels').checked,
+                };
+                try {
+                    const res = await fetch('/admin/billboard-config', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(cfg)
+                    });
+                    if ((await res.json()).success) {
+                        const msg = document.getElementById('billboard-save-msg');
+                        msg.style.display = 'block';
+                        setTimeout(() => msg.style.display = 'none', 3000);
+                    }
+                } catch (e) { alert('Error saving settings'); }
+            }
+
+            loadBillboardConfig();
+
+            // Class CRUD
+            function showAddClassModal() {
+                document.getElementById('add-class-form').reset();
+                document.getElementById('add-class-modal').style.display = 'block';
+            }
+            function closeAddClassModal() {
+                document.getElementById('add-class-modal').style.display = 'none';
+            }
+            function showEditClassModal(cls) {
+                document.getElementById('edit-class-id').value = cls.id;
+                document.getElementById('edit-class-name').value = cls.name;
+                document.getElementById('edit-class-desc').value = cls.description || '';
+                document.getElementById('edit-class-team').checked = !!cls.is_team;
+                document.getElementById('edit-class-modal').style.display = 'block';
+            }
+            function closeEditClassModal() {
+                document.getElementById('edit-class-modal').style.display = 'none';
+            }
+
+            async function submitAddClass(e) {
+                e.preventDefault();
+                const res = await fetch('/admin/classes', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('add-class-name').value.trim(),
+                        description: document.getElementById('add-class-desc').value.trim(),
+                        is_team: document.getElementById('add-class-team').checked,
+                    }),
+                });
+                if ((await res.json()).success) { closeAddClassModal(); window.location.reload(); }
+                else alert('Error saving class');
+            }
+
+            async function submitEditClass(e) {
+                e.preventDefault();
+                const id = document.getElementById('edit-class-id').value;
+                const res = await fetch(`/admin/classes/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        name: document.getElementById('edit-class-name').value.trim(),
+                        description: document.getElementById('edit-class-desc').value.trim(),
+                        is_team: document.getElementById('edit-class-team').checked,
+                    }),
+                });
+                if ((await res.json()).success) { closeEditClassModal(); window.location.reload(); }
+                else alert('Error updating class');
+            }
+
+            async function deleteClass(id, btn) {
+                if (!confirm('Delete this class? Contestants will be unassigned.')) return;
+                btn.disabled = true;
+                const res = await fetch(`/admin/classes/${id}`, { method: 'DELETE' });
+                if ((await res.json()).success) window.location.reload();
+                else { alert('Error deleting class'); btn.disabled = false; }
+            }
+
+            async function loadVotes() {
+                try {
+                    const rows = await fetch('/admin/votes').then(r => r.json());
+                    const tbody = document.getElementById('votes-tbody');
+                    tbody.innerHTML = rows.map(r => {
+                        const photo = r.photo_path
+                            ? `<img src="/static/${r.photo_path}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">`
+                            : '—';
+                        const last = r.last_vote ? new Date(r.last_vote).toLocaleString() : '—';
+                        return `<tr>
+                            <td style="padding:6px 8px;">${photo}</td>
+                            <td style="padding:6px 8px;">${r.name}</td>
+                            <td style="padding:6px 8px; text-align:center; font-weight:bold;">${r.vote_count}</td>
+                            <td style="padding:6px 8px; color:#888; font-size:0.85rem;">${last}</td>
+                        </tr>`;
+                    }).join('');
+                    document.getElementById('votes-loading').style.display = 'none';
+                    document.getElementById('votes-table').style.display = '';
+                } catch (e) { document.getElementById('votes-loading').textContent = 'Failed to load votes.'; }
             }
 
             // Set up search input handler

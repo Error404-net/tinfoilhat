@@ -13,6 +13,7 @@ CREATE TABLE contestant (
   phone_number TEXT,
   email TEXT,
   notes TEXT,
+  photo_path TEXT,
   created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -36,6 +37,14 @@ CREATE TABLE test_data (
   hat_level REAL NOT NULL,
   attenuation REAL NOT NULL,
   FOREIGN KEY (test_result_id) REFERENCES test_result (id)
+);
+
+-- Votes table (popular vote for best hat design)
+CREATE TABLE IF NOT EXISTS votes (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  contestant_id INTEGER NOT NULL,
+  created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY (contestant_id) REFERENCES contestant (id)
 );
 
 -- Measurement cache table (for in-progress measurements persistence between app restarts)

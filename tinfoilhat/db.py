@@ -128,6 +128,81 @@ def ensure_hat_type_column_exists():
         print("Added hat_type column to test_result table")
 
 
+def ensure_settings_table_exists():
+    """Create settings table and seed defaults for billboard config."""
+    db = get_db()
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS settings (
+            key TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        )
+    """)
+    db.commit()
+    defaults = {
+        "billboard_show_classic": "1",
+        "billboard_show_hybrid": "1",
+        "billboard_show_spectrum": "1",
+        "billboard_show_votes": "0",
+        "billboard_vote_show_labels": "0",
+    }
+    for k, v in defaults.items():
+        db.execute("INSERT OR IGNORE INTO settings (key, value) VALUES (?, ?)", (k, v))
+    db.commit()
+
+
+def ensure_photo_path_column_exists():
+    """Ensure photo_path column exists on contestant (migration for existing DBs)."""
+    db = get_db()
+    if not db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='contestant'").fetchone():
+        return  # table not created yet — schema.sql will include the column
+    try:
+        db.execute("SELECT photo_path FROM contestant LIMIT 1")
+    except Exception:
+        db.execute("ALTER TABLE contestant ADD COLUMN photo_path TEXT")
+        db.commit()
+
+
+def ensure_votes_table_exists():
+    """Ensure the votes table exists."""
+    db = get_db()
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS votes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            contestant_id INTEGER NOT NULL,
+            created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (contestant_id) REFERENCES contestant (id)
+        )
+    """)
+    db.commit()
+
+
+def ensure_class_table_exists():
+    """Ensure the class table exists."""
+    db = get_db()
+    db.execute("""
+        CREATE TABLE IF NOT EXISTS class (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            name TEXT NOT NULL UNIQUE,
+            description TEXT,
+            is_team BOOLEAN NOT NULL DEFAULT 0,
+            created TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    db.commit()
+
+
+def ensure_contestant_class_column_exists():
+    """Add class_id FK to contestant if missing (migration for existing DBs)."""
+    db = get_db()
+    if not db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='contestant'").fetchone():
+        return
+    try:
+        db.execute("SELECT class_id FROM contestant LIMIT 1")
+    except Exception:
+        db.execute("ALTER TABLE contestant ADD COLUMN class_id INTEGER REFERENCES class(id)")
+        db.commit()
+
+
 def init_db():
     """
     Initialize the database with schema.
@@ -138,11 +213,13 @@ def init_db():
     with schema_path.open("r") as f:
         db.executescript(f.read())
 
-    # Make sure the measurement_cache table exists
     ensure_measurement_cache_exists()
-
-    # Make sure the hat_type column exists in test_result
     ensure_hat_type_column_exists()
+    ensure_photo_path_column_exists()
+    ensure_votes_table_exists()
+    ensure_settings_table_exists()
+    ensure_class_table_exists()
+    ensure_contestant_class_column_exists()
 
 
 @click.command("init-db")

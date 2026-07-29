@@ -117,7 +117,7 @@ The Tinfoil Hat Competition tests the signal attenuation properties of contestan
 - [x] Implement consistent error handling patterns across all frontend components
   - Completed: Created centralized ErrorHandler.js component and integrated it with all existing components
 - [ ] Remove duplicate code in event handlers, particularly reset/error handling logic
-- [ ] Create proper error boundaries around chart rendering operations
+
 - [ ] Refactor the SSE event handling to reduce complexity
 - [ ] Consider migrating to a proper frontend framework (Vue.js or React)
 

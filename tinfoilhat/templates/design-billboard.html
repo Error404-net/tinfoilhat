@@ -1,0 +1,230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tinfoil Hat — Popular Vote</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
+
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            background: #000;
+            height: 100vh;
+            overflow: hidden;
+            position: relative;
+            font-family: 'VT323', monospace;
+        }
+
+        /* CRT scanlines overlay */
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 3px,
+                rgba(0,0,0,0.18) 3px,
+                rgba(0,0,0,0.18) 4px
+            );
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        /* Vignette */
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at center, transparent 60%, rgba(0,0,0,0.75) 100%);
+            z-index: 101;
+            pointer-events: none;
+        }
+
+        /* Nav overlay */
+        .nav {
+            position: fixed;
+            top: 0; right: 0;
+            z-index: 200;
+            display: flex;
+            gap: 2px;
+            background: rgba(0,0,0,0.6);
+            padding: 6px 10px;
+            border-bottom-left-radius: 6px;
+        }
+
+        .nav a {
+            color: #33ff33;
+            text-decoration: none;
+            font-size: 0.9rem;
+            padding: 2px 6px;
+            opacity: 0.7;
+        }
+
+        .nav a:hover { opacity: 1; text-decoration: underline; }
+        .nav span { color: #33ff334d; font-size: 0.9rem; line-height: 1.6; }
+
+        /* Countdown */
+        #countdown {
+            position: fixed;
+            bottom: 8px;
+            right: 10px;
+            z-index: 200;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.55rem;
+            color: #33ff33;
+            opacity: 0.35;
+        }
+
+        /* Photo grid — fills entire viewport */
+        .photo-grid {
+            display: grid;
+            width: 100vw;
+            height: 100vh;
+            /* columns/rows set by JS based on count */
+        }
+
+        .photo-cell {
+            position: relative;
+            overflow: hidden;
+            background: #0a0a0a;
+        }
+
+        .photo-cell img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        /* Placeholder when no photo */
+        .photo-cell .no-photo {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: clamp(3rem, 10vw, 8rem);
+            background: #0d0d0d;
+            border: 1px solid #1a1a1a;
+        }
+
+        /* Label overlay — hidden unless show_labels is on */
+        .photo-label {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.85));
+            padding: 18px 12px 10px;
+            color: #33ff33;
+            display: {% if show_labels %}flex{% else %}none{% endif %};
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .label-name {
+            font-family: 'Press Start 2P', cursive;
+            font-size: clamp(0.5rem, 1.5vw, 0.85rem);
+            text-shadow: 0 0 4px #33ff33;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .label-votes {
+            font-size: clamp(0.8rem, 2vw, 1.2rem);
+            color: #aaffaa;
+        }
+
+        .label-votes strong { color: #33ff33; }
+
+        /* Empty state */
+        .empty {
+            width: 100vw;
+            height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: #33ff33;
+            font-family: 'Press Start 2P', cursive;
+            font-size: clamp(0.7rem, 2vw, 1.2rem);
+            gap: 20px;
+            background: #000;
+        }
+
+        .empty p { color: #555; font-size: 0.7em; font-family: 'VT323', monospace; }
+    </style>
+</head>
+<body>
+
+{% if not embedded %}
+<nav class="nav">
+    <a href="/billboard">RF Billboard</a>
+    <span>|</span>
+    <a href="/vote">Vote</a>
+    <span>|</span>
+    <a href="/admin">Admin</a>
+</nav>
+<div id="countdown"></div>
+{% endif %}
+
+{% set contestants = top_voted | list %}
+{% if contestants %}
+<div class="photo-grid" id="grid">
+    {% for c in contestants %}
+    <div class="photo-cell">
+        {% if c.photo_path %}
+            <img src="{{ url_for('static', filename=c.photo_path) }}" alt="{{ c.name }}">
+        {% else %}
+            <div class="no-photo">🎩</div>
+        {% endif %}
+        <div class="photo-label">
+            <span class="label-name">{{ c.name }}</span>
+            <span class="label-votes"><strong>{{ c.vote_count }}</strong> vote{{ 's' if c.vote_count != 1 else '' }}</span>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+    // Set grid dimensions to fill the viewport with equal cells
+    const count = {{ contestants | length }};
+    const grid = document.getElementById('grid');
+
+    function setGrid() {
+        // Pick cols to keep cells roughly square
+        const w = window.innerWidth, h = window.innerHeight;
+        let cols = Math.ceil(Math.sqrt(count * (w / h)));
+        cols = Math.max(1, Math.min(cols, count));
+        const rows = Math.ceil(count / cols);
+        grid.style.gridTemplateColumns = `repeat(${cols}, 1fr)`;
+        grid.style.gridTemplateRows = `repeat(${rows}, 1fr)`;
+    }
+
+    setGrid();
+    window.addEventListener('resize', setGrid);
+</script>
+
+{% else %}
+<div class="empty">
+    <div>NO VOTES YET</div>
+    <p>Cast your vote at /vote</p>
+</div>
+{% endif %}
+
+{% if not embedded %}
+<script>
+    let t = 30;
+    const cd = document.getElementById('countdown');
+    setInterval(() => {
+        t--;
+        cd.textContent = `REFRESH ${t}s`;
+        if (t <= 0) window.location.reload();
+    }, 1000);
+</script>
+{% endif %}
+
+</body>
+</html>

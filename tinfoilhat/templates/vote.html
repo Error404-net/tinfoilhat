@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vote for Your Favorite Hat!</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        body {
+            font-family: 'Share Tech Mono', 'IBM Plex Mono', 'Courier New', monospace;
+            background: #0a0a0a;
+            color: #00ff41;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            padding: 20px 0 30px;
+            border-bottom: 2px solid #00ff41;
+            margin-bottom: 30px;
+        }
+
+        header h1 {
+            font-size: clamp(1.4rem, 4vw, 2.4rem);
+            letter-spacing: 0.1em;
+            text-shadow: 0 0 10px #00ff41;
+        }
+
+        header p {
+            margin-top: 8px;
+            color: #aaa;
+            font-size: 0.9rem;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            gap: 20px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .card {
+            background: #111;
+            border: 1px solid #00ff41;
+            border-radius: 6px;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.2s;
+        }
+
+        .card:hover {
+            box-shadow: 0 0 16px #00ff4166;
+        }
+
+        .card-photo {
+            width: 100%;
+            aspect-ratio: 1;
+            object-fit: cover;
+            background: #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            color: #333;
+        }
+
+        .card-photo img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .card-body {
+            padding: 14px;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .card-name {
+            font-size: 1rem;
+            font-weight: bold;
+            color: #00ff41;
+            word-break: break-word;
+        }
+
+        .vote-count {
+            font-size: 0.85rem;
+            color: #aaa;
+        }
+
+        .vote-count span {
+            color: #00ff41;
+            font-size: 1.1rem;
+        }
+
+        .vote-btn {
+            margin-top: auto;
+            padding: 12px;
+            background: transparent;
+            border: 2px solid #00ff41;
+            color: #00ff41;
+            font-family: inherit;
+            font-size: 1rem;
+            cursor: pointer;
+            border-radius: 4px;
+            letter-spacing: 0.05em;
+            transition: background 0.15s, color 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .vote-btn:hover, .vote-btn:active {
+            background: #00ff41;
+            color: #0a0a0a;
+        }
+
+        .vote-btn.voted {
+            background: #00ff41;
+            color: #0a0a0a;
+            border-color: #00ff41;
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%) translateY(80px);
+            background: #00ff41;
+            color: #0a0a0a;
+            padding: 12px 28px;
+            border-radius: 4px;
+            font-size: 1rem;
+            font-weight: bold;
+            transition: transform 0.3s ease;
+            pointer-events: none;
+            z-index: 100;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 60px 20px;
+            color: #555;
+            font-size: 1.1rem;
+        }
+    </style>
+</head>
+<body>
+
+<header>
+    <h1>&gt; VOTE FOR YOUR FAVORITE HAT &lt;</h1>
+    <p>Tap a contestant's card to cast your vote</p>
+</header>
+
+{% if classes %}
+<div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center; margin-bottom:24px;">
+    <a href="/vote" style="padding:8px 16px; border:1px solid #00ff41; border-radius:4px; color:{% if not active_class %}#0a0a0a{% else %}#00ff41{% endif %}; background:{% if not active_class %}#00ff41{% else %}transparent{% endif %}; text-decoration:none; font-family:inherit; font-size:0.9rem;">All</a>
+    {% for cls in classes %}
+    <a href="/vote?class_id={{ cls.id }}" style="padding:8px 16px; border:1px solid #00ff41; border-radius:4px; color:{% if active_class == cls.id %}#0a0a0a{% else %}#00ff41{% endif %}; background:{% if active_class == cls.id %}#00ff41{% else %}transparent{% endif %}; text-decoration:none; font-family:inherit; font-size:0.9rem;">{{ cls.name }}{% if cls.is_team %} (Team){% endif %}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+<div class="toast" id="toast">VOTE CAST!</div>
+
+{% if contestants %}
+<div class="grid">
+    {% for c in contestants %}
+    <div class="card">
+        <div class="card-photo">
+            {% if c.photo_path %}
+                <img src="{{ url_for('static', filename=c.photo_path) }}" alt="{{ c.name }}">
+            {% else %}
+                🎩
+            {% endif %}
+        </div>
+        <div class="card-body">
+            <div class="card-name">{{ c.name }}</div>
+            {% if c.class_name %}
+            <div style="font-size:0.75rem; color:#555; margin-top:-4px;">{% if c.is_team %}Team: {% endif %}{{ c.class_name }}</div>
+            {% endif %}
+            <div class="vote-count">Votes: <span id="count-{{ c.id }}">{{ c.vote_count }}</span></div>
+            <button class="vote-btn" onclick="vote({{ c.id }}, this)">VOTE</button>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{% set total_pages = ((total - 1) // per_page + 1) if total > 0 else 1 %}
+{% if total_pages > 1 %}
+<div style="display:flex; gap:8px; justify-content:center; margin-top:30px; flex-wrap:wrap;">
+    {% for p in range(1, total_pages + 1) %}
+    <a href="/vote?{% if active_class %}class_id={{ active_class }}&{% endif %}page={{ p }}"
+       style="padding:8px 14px; border:1px solid #00ff41; border-radius:4px; color:{% if p == page %}#0a0a0a{% else %}#00ff41{% endif %}; background:{% if p == page %}#00ff41{% else %}transparent{% endif %}; text-decoration:none; font-family:inherit;">{{ p }}</a>
+    {% endfor %}
+</div>
+{% endif %}
+
+{% else %}
+<div class="empty-state">No contestants registered yet.</div>
+{% endif %}
+
+<script>
+    async function vote(id, btn) {
+        btn.disabled = true;
+        try {
+            const res = await fetch(`/vote/${id}`, { method: 'POST' });
+            const data = await res.json();
+            if (data.status === 'success') {
+                document.getElementById(`count-${id}`).textContent = data.vote_count;
+                btn.classList.add('voted');
+                btn.textContent = 'VOTED!';
+                showToast();
+            }
+        } catch (e) {
+            btn.disabled = false;
+        }
+        // Re-enable after 3s so the kiosk can be reused
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.classList.remove('voted');
+            btn.textContent = 'VOTE';
+        }, 3000);
+    }
+
+    function showToast() {
+        const t = document.getElementById('toast');
+        t.classList.add('show');
+        setTimeout(() => t.classList.remove('show'), 2000);
+    }
+
+    // Refresh vote counts every 15s (other kiosks may be voting)
+    setInterval(async () => {
+        try {
+            const res = await fetch('/vote');
+            const html = new DOMParser().parseFromString(await res.text(), 'text/html');
+            html.querySelectorAll('[id^="count-"]').forEach(el => {
+                const live = document.getElementById(el.id);
+                if (live && !live.closest('.card').querySelector('.vote-btn').disabled) {
+                    live.textContent = el.textContent;
+                }
+            });
+        } catch (_) {}
+    }, 15000);
+</script>
+
+</body>
+</html>

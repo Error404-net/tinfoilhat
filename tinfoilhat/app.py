@@ -11,7 +11,16 @@ from contextlib import suppress
 from flask import Flask
 
 from tinfoilhat import routes
-from tinfoilhat.db import close_db, ensure_measurement_cache_exists, init_db
+from tinfoilhat.db import (
+    close_db,
+    ensure_class_table_exists,
+    ensure_contestant_class_column_exists,
+    ensure_measurement_cache_exists,
+    ensure_photo_path_column_exists,
+    ensure_settings_table_exists,
+    ensure_votes_table_exists,
+    init_db,
+)
 
 
 def create_app(test_config=None):
@@ -25,11 +34,15 @@ def create_app(test_config=None):
     """
     # Create and configure the app
     app = Flask(__name__, instance_relative_config=True)
+    uploads_dir = os.path.join(app.root_path, "static", "uploads")
     app.config.from_mapping(
         SECRET_KEY=os.environ.get("SECRET_KEY", "dev"),
         DATABASE=os.path.join(app.instance_path, "tinfoilhat.sqlite"),
         TESTING=False,
+        UPLOAD_FOLDER=uploads_dir,
+        MAX_CONTENT_LENGTH=16 * 1024 * 1024,  # 16 MB cap on uploads
     )
+    os.makedirs(uploads_dir, exist_ok=True)
 
     if test_config is None:
         # Load the instance config, if it exists, when not testing
@@ -49,9 +62,13 @@ def create_app(test_config=None):
             init_db()
             print(f"Created new database at {db_path}")
     else:
-        # Make sure measurement_cache table exists
         with app.app_context():
             ensure_measurement_cache_exists()
+            ensure_photo_path_column_exists()
+            ensure_votes_table_exists()
+            ensure_settings_table_exists()
+            ensure_class_table_exists()
+            ensure_contestant_class_column_exists()
             print(f"Validated database schema at {db_path}")
 
     # Register database close function to be called when cleaning up app context

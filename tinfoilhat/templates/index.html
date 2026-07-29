@@ -533,9 +533,11 @@
         
         <!-- Navigation Links -->
         <div class="nav-links">
-            <a href="/" class="nav-link">Home</a> | 
-            <a href="/admin" class="nav-link">Admin Panel</a> | 
-            <a href="/billboard" class="nav-link">Billboard</a>
+            <a href="/" class="nav-link">Home</a> |
+            <a href="/admin" class="nav-link">Admin Panel</a> |
+            <a href="/billboard" class="nav-link">Billboard</a> |
+            <a href="/design-billboard" class="nav-link">Vote Showcase</a> |
+            <a href="/vote" class="nav-link">Vote</a>
         </div>
     </div>
     
@@ -563,6 +565,18 @@
                     <button id="filter-hybrid" class="filter-button {% if active_filter == 'hybrid' %}filter-active{% endif %}" data-filter="hybrid">Hybrid</button>
                 </div>
 
+                {% if classes %}
+                <div style="margin-bottom: 15px; display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                    <strong class="filter-label">Class:</strong>
+                    <select id="class-filter" style="padding:6px 10px; border:1px solid var(--border-color); border-radius:4px; background:var(--input-background); color:var(--text-color);">
+                        <option value="">All Classes</option>
+                        {% for cls in classes %}
+                        <option value="{{ cls.id }}" {% if active_class == cls.id %}selected{% endif %}>{{ cls.name }}{% if cls.is_team %} (Team){% endif %}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                {% endif %}
+
                 <!-- Add search input -->
                 <div style="margin-bottom: 15px; display: flex; align-items: center; gap: 10px;">
                     <div class="filter-label" style="display: flex; align-items: center; margin-right: 5px;">
@@ -575,7 +589,9 @@
                     <thead>
                         <tr>
                             <th>Rank</th>
+                            <th>Photo</th>
                             <th>Contestant Name</th>
+                            <th>Class</th>
                             <th>Hat Type</th>
                             <th>Attenuation Score</th>
                             <th>Test Date</th>
@@ -585,7 +601,19 @@
                         {% for contestant in leaderboard %}
                             <tr>
                                 <td>{{ loop.index }}</td>
+                                <td>
+                                    {% if contestant.photo_path %}
+                                        <img src="{{ url_for('static', filename=contestant.photo_path) }}" style="width:40px;height:40px;object-fit:cover;border-radius:4px;">
+                                    {% else %}
+                                        &mdash;
+                                    {% endif %}
+                                </td>
                                 <td>{{ contestant.name }}</td>
+                                <td style="font-size:0.85rem; color:#888;">
+                                    {% if contestant.class_name %}
+                                        {% if contestant.is_team %}Team: {% endif %}{{ contestant.class_name }}
+                                    {% else %}&mdash;{% endif %}
+                                </td>
                                 <td>{{ contestant.hat_type|title }}</td>
                                 <td>{{ "%.2f"|format(contestant.average_attenuation) }}</td>
                                 <td>{{ contestant.test_date }}</td>
@@ -593,11 +621,12 @@
                         {% endfor %}
                         {% if leaderboard|length == 0 %}
                             <tr>
-                                <td colspan="5" style="text-align: center; padding: 20px;">No results found with the current filter. <a href="/" style="color: #3498db;">Clear filter</a></td>
+                                <td colspan="7" style="text-align: center; padding: 20px;">No results found with the current filter. <a href="/" style="color: #3498db;">Clear filter</a></td>
                             </tr>
                         {% endif %}
                     </tbody>
                 </table>
+                <div id="leaderboard-pagination" style="display:flex; gap:8px; align-items:center; margin-top:12px; flex-wrap:wrap;"></div>
             </div>
         </div>
         
@@ -720,7 +749,7 @@
                     updateFilterIndicator(filterValue);
                     
                     // Update leaderboard with filter
-                    updateLeaderboard(null, filterValue);
+                    updateLeaderboard(null, filterValue, '', null, 1);
                     
                     // Blur the button to remove focus
                     this.blur();
@@ -729,7 +758,19 @@
             
             // Initialize filter indicator
             updateFilterIndicator('all');
-            
+
+            // Class filter dropdown
+            const classFilter = document.getElementById('class-filter');
+            if (classFilter) {
+                // Set initial value from server-rendered active_class
+                _currentClassId = classFilter.value;
+                classFilter.addEventListener('change', function() {
+                    const activeHat = document.querySelector('.filter-button.filter-active')?.dataset.filter || 'all';
+                    const search = document.getElementById('search-input')?.value || '';
+                    updateLeaderboard(null, activeHat, search, this.value, 1);
+                });
+            }
+
             // Add event listener for contestant registration form
             const registrationForm = document.getElementById('new-contestant-form');
             registrationForm.addEventListener('submit', function(event) {
@@ -750,12 +791,14 @@
             // Close the modal when the close button is clicked
             closeRegistrationModalBtn.addEventListener('click', function() {
                 registrationModal.style.display = 'none';
+                window.regWebcam?.cancel();
             });
-            
+
             // Close the modal when clicking outside of it
             window.addEventListener('click', function(event) {
                 if (event.target === registrationModal) {
                     registrationModal.style.display = 'none';
+                    window.regWebcam?.cancel();
                 }
             });
             
@@ -809,6 +852,8 @@
         // Handle contestant registration form submission
         async function submitRegistrationForm(form) {
             const formData = new FormData(form);
+            const blob = window.regWebcam?.getBlob();
+            if (blob) formData.set('photo', blob, 'webcam.jpg');
             const messagesContainer = document.getElementById('registration-messages');
             const registrationModal = document.getElementById('registration-modal');
             const continueModalOpen = document.getElementById('continue-modal').style.display === 'block';
@@ -827,6 +872,7 @@
                 if (result.status === 'success') {
                     // After submission, reset form and update leaderboard/contestants
                     form.reset();
+                    window.regWebcam?.reset();
                     
                     // Display success message
                     messagesContainer.textContent = result.message || 'Contestant registered successfully!';
@@ -1431,90 +1477,60 @@
             }
         }
         
+        // Leaderboard state
+        let _currentPage = 1;
+        let _currentClassId = '';
+
         // Fetch and update the leaderboard
-        async function updateLeaderboard(highlightTeam = null, hatTypeFilter = null, searchQuery = '') {
+        async function updateLeaderboard(highlightTeam = null, hatTypeFilter = null, searchQuery = '', classId = null, page = 1) {
+            if (classId !== null) _currentClassId = classId;
+            _currentPage = page;
             try {
-                // Build URL with filter if specified
-                let url = '/leaderboard';
                 const params = new URLSearchParams();
-                
                 if (hatTypeFilter && hatTypeFilter !== 'all') {
                     params.append('hat_type', hatTypeFilter);
                 } else {
                     params.append('show_all_types', 'true');
                 }
-                
-                if (searchQuery) {
-                    params.append('search', searchQuery);
-                }
-                
-                if (params.toString()) {
-                    url += '?' + params.toString();
-                }
-                
-                const response = await fetch(url);
+                if (searchQuery) params.append('search', searchQuery);
+                if (_currentClassId) params.append('class_id', _currentClassId);
+                if (_currentPage > 1) params.append('page', _currentPage);
+
+                const response = await fetch('/leaderboard?' + params.toString());
                 const data = await response.json();
-                
+
                 const leaderboardBody = document.querySelector('#leaderboard tbody');
-                leaderboardBody.innerHTML = ''; // Clear existing rows
-                
-                // Get the stored latest contestant (if any)
+                leaderboardBody.innerHTML = '';
+
                 const latestContestant = localStorage.getItem('latestContestant');
-                // Get stored latest hat type (if any)
                 const latestHatType = localStorage.getItem('latestHatType');
-                
-                // If a new highlightTeam is provided, update the latest contestant
-                if (highlightTeam) {
-                    localStorage.setItem('latestContestant', highlightTeam);
-                }
-                
+                if (highlightTeam) localStorage.setItem('latestContestant', highlightTeam);
+
                 if (data.leaderboard.length === 0) {
-                    // No results found
-                    const emptyRow = document.createElement('tr');
-                    emptyRow.innerHTML = `
-                        <td colspan="5" style="text-align: center; padding: 20px;">
-                            No results found with the current filter. 
-                            <a href="javascript:void(0)" onclick="resetFilter()" style="color: var(--button-color);">Clear filter</a>
-                        </td>
-                    `;
-                    leaderboardBody.appendChild(emptyRow);
+                    leaderboardBody.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;">
+                        No results found. <a href="javascript:void(0)" onclick="resetFilter()" style="color:var(--button-color);">Clear filter</a>
+                    </td></tr>`;
                 } else {
-                    // Sort entries by attenuation (highest first)
                     data.leaderboard.sort((a, b) => b.average_attenuation - a.average_attenuation);
-                    
-                    // Add each leaderboard entry
                     data.leaderboard.forEach((entry, index) => {
                         const row = document.createElement('tr');
-                        
-                        // Check if this is the latest score by contestant name and hat type
-                        const isLatestScore = latestContestant === entry.name && 
-                                            latestHatType === entry.hat_type;
-                        
-                        // Add highlight class if this is the team we just updated
-                        if (highlightTeam && entry.name === highlightTeam && 
-                            (hatTypeFilter === 'all' || !latestHatType || latestHatType === entry.hat_type)) {
-                            row.classList.add('highlight-row');
-                        }
-                        
-                        // Add persistent highlighting class if this is the latest contestant and hat type
-                        // (but not if we're already highlighting a new one with animation)
+                        const isLatestScore = latestContestant === entry.name && latestHatType === entry.hat_type;
+                        if (highlightTeam && entry.name === highlightTeam && (hatTypeFilter === 'all' || !latestHatType || latestHatType === entry.hat_type)) row.classList.add('highlight-row');
                         const isLatest = !highlightTeam && isLatestScore;
-                        if (isLatest) {
-                            row.classList.add('latest-score-row');
-                        }
-                        
-                        // Add "Latest" badge if this is the latest contestant
+                        if (isLatest) row.classList.add('latest-score-row');
                         const latestBadge = isLatest ? `<span class="latest-badge">Latest</span>` : '';
-                        
-                        // Create hat type badge
                         const hatTypeBadge = `<span class="hat-type-badge hat-type-${entry.hat_type}">${entry.hat_type.charAt(0).toUpperCase() + entry.hat_type.slice(1)}</span>`;
-                        
-                        // Calculate actual rank (index + 1)
-                        const rank = index + 1;
-                        
+                        const photoCell = entry.photo_path
+                            ? `<img src="/static/${entry.photo_path}" style="width:36px;height:36px;object-fit:cover;border-radius:4px;">`
+                            : '&mdash;';
+                        const classCell = entry.class_name
+                            ? `<span style="font-size:0.8rem;color:#888;">${entry.is_team ? 'Team: ' : ''}${entry.class_name}</span>`
+                            : '&mdash;';
                         row.innerHTML = `
-                            <td>${rank}</td>
+                            <td>${entry.rank}</td>
+                            <td>${photoCell}</td>
                             <td>${entry.name} ${latestBadge}</td>
+                            <td>${classCell}</td>
                             <td>${hatTypeBadge}</td>
                             <td>${entry.average_attenuation.toFixed(2)}</td>
                             <td>${entry.test_date}</td>
@@ -1522,11 +1538,33 @@
                         leaderboardBody.appendChild(row);
                     });
                 }
-                
-                // If the data includes updated contestants list, refresh the dropdown
-                if (data.contestants) {
-                    refreshContestantDropdown(data.contestants);
+
+                // Pagination controls
+                const perPage = data.per_page || 50;
+                const total = data.total || 0;
+                const totalPages = Math.ceil(total / perPage);
+                const pagDiv = document.getElementById('leaderboard-pagination');
+                pagDiv.innerHTML = '';
+                if (totalPages > 1) {
+                    for (let p = 1; p <= totalPages; p++) {
+                        const btn = document.createElement('button');
+                        btn.textContent = p;
+                        btn.className = 'filter-button' + (p === _currentPage ? ' filter-active' : '');
+                        btn.style.minWidth = '36px';
+                        btn.onclick = () => {
+                            const activeHat = document.querySelector('.filter-button.filter-active')?.dataset.filter || 'all';
+                            const search = document.getElementById('search-input')?.value || '';
+                            updateLeaderboard(null, activeHat, search, null, p);
+                        };
+                        pagDiv.appendChild(btn);
+                    }
+                    const info = document.createElement('span');
+                    info.style.cssText = 'color:#888;font-size:0.85rem;';
+                    info.textContent = `${total} total`;
+                    pagDiv.appendChild(info);
                 }
+
+                if (data.contestants) refreshContestantDropdown(data.contestants);
             } catch (error) {
                 console.error('Error updating leaderboard:', error);
             }
@@ -1593,7 +1631,7 @@
         <div class="modal-content">
             <span class="close-modal">&times;</span>
             <h2>Contestant Registration</h2>
-            <form id="new-contestant-form" action="{{ url_for('tinfoilhat.add_contestant') }}" method="post">
+            <form id="new-contestant-form" action="{{ url_for('tinfoilhat.add_contestant') }}" method="post" enctype="multipart/form-data">
                 <div class="form-group">
                     <label for="name">Team Name:</label>
                     <input type="text" id="name" name="name" required>
@@ -1610,6 +1648,23 @@
                 <div class="form-group">
                     <label for="notes">Notes:</label>
                     <textarea id="notes" name="notes" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Hat Photo (optional):</label>
+                    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+                        <input type="file" id="photo" name="photo" accept="image/*" style="flex:1;">
+                        <button type="button" id="reg-webcam-btn" style="white-space:nowrap;">📷 Use Webcam</button>
+                    </div>
+                    <div style="margin-top:8px;">
+                        <video id="reg-video" autoplay playsinline style="display:none;max-width:100%;border-radius:4px;"></video>
+                        <canvas id="reg-canvas" style="display:none;"></canvas>
+                        <img id="reg-preview" style="display:none;max-width:100%;border-radius:4px;" alt="Captured photo">
+                        <div style="margin-top:6px;display:flex;gap:6px;">
+                            <button type="button" id="reg-snap-btn"   style="display:none;">Snap</button>
+                            <button type="button" id="reg-retake-btn" style="display:none;">Retake</button>
+                            <button type="button" id="reg-cancel-btn" style="display:none;background:#888;">Cancel</button>
+                        </div>
+                    </div>
                 </div>
                 <button type="submit">Register New Contestant</button>
             </form>
@@ -1749,6 +1804,21 @@
             if (theme === 'dark' && spectrumChart) {
                 updateChartTheme('dark');
             }
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/webcam.js') }}"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            window.regWebcam = new WebcamCapture({
+                videoEl:   document.getElementById('reg-video'),
+                canvasEl:  document.getElementById('reg-canvas'),
+                previewEl: document.getElementById('reg-preview'),
+                fileInput: document.getElementById('photo'),
+                snapBtn:   document.getElementById('reg-snap-btn'),
+                retakeBtn: document.getElementById('reg-retake-btn'),
+                webcamBtn: document.getElementById('reg-webcam-btn'),
+                cancelBtn: document.getElementById('reg-cancel-btn'),
+            });
         });
     </script>
 </body>

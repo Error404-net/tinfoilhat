@@ -5,11 +5,17 @@ This module defines all HTTP endpoints for the Flask application.
 """
 
 import contextlib
+import csv
+import io
 import json
+import os
 import queue
 import time
 import traceback
+import zipfile
 from datetime import datetime
+
+from werkzeug.utils import secure_filename
 
 from flask import (
     Blueprint,
@@ -28,6 +34,20 @@ from tinfoilhat.db import get_db
 from tinfoilhat.scanner import Scanner
 
 bp = Blueprint("tinfoilhat", __name__, url_prefix="")
+
+ALLOWED_IMAGE_EXTENSIONS = {"jpg", "jpeg", "png", "gif", "webp"}
+
+
+def _save_photo(file, contestant_id):
+    """Save uploaded photo to static/uploads/, return path relative to static/ or None."""
+    if not file or not file.filename:
+        return None
+    ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+    if ext not in ALLOWED_IMAGE_EXTENSIONS:
+        return None
+    filename = secure_filename(f"contestant_{contestant_id}.{ext}")
+    file.save(os.path.join(current_app.config["UPLOAD_FOLDER"], filename))
+    return f"uploads/{filename}"
 
 # Instead of creating the scanner at module level, create it for each request
 # This will prevent issues when Flask reloads the application
@@ -238,60 +258,67 @@ def index():
     # Load any cached measurements into the app config
     load_measurements_to_config()
 
-    # Get hat_type filter parameter
+    # Get filter parameters
     hat_type = request.args.get("hat_type")
+    class_id = request.args.get("class_id", type=int)
 
-    # Get leaderboard data - only the best scores per contestant
     db = get_db()
 
-    # Build the query based on filter
+    # Build the leaderboard query
     query = """
-        SELECT c.name, t.average_attenuation, t.test_date, t.hat_type
+        SELECT c.name, c.photo_path, c.class_id,
+               cl.name AS class_name, cl.is_team,
+               t.average_attenuation, t.test_date, t.hat_type
         FROM contestant c
         JOIN test_result t ON c.id = t.contestant_id
+        LEFT JOIN class cl ON cl.id = c.class_id
         WHERE t.is_best_score = 1
     """
-
-    # Add hat_type filter if provided
     params = []
     if hat_type and hat_type.lower() in ["classic", "hybrid"]:
         query += " AND t.hat_type = ?"
         params.append(hat_type.lower())
-
-    # Add order by clause
+    if class_id:
+        query += " AND c.class_id = ?"
+        params.append(class_id)
     query += " ORDER BY t.average_attenuation DESC"
 
-    # Execute the query
     leaderboard = db.execute(query, params).fetchall()
 
     # Get all contestants for the dropdown
-    contestants = db.execute("SELECT id, name FROM contestant").fetchall()
+    contestants = db.execute("SELECT id, name FROM contestant ORDER BY name").fetchall()
+    classes = db.execute("SELECT id, name, is_team FROM class ORDER BY name").fetchall()
 
-    return render_template("index.html", leaderboard=leaderboard, contestants=contestants, active_filter=hat_type)
+    return render_template(
+        "index.html",
+        leaderboard=leaderboard,
+        contestants=contestants,
+        classes=classes,
+        active_filter=hat_type,
+        active_class=class_id,
+    )
 
 
 @bp.route("/leaderboard", methods=["GET"])
 def get_leaderboard():
-    """
-    API endpoint to fetch the current leaderboard data.
-
-    :return: JSON response with leaderboard data and contestants list
-    :rtype: Response
-    """
-    # Get hat_type filter parameter
+    """API endpoint to fetch the current leaderboard data with optional filters and pagination."""
     hat_type = request.args.get("hat_type")
-    # Get show_all_types parameter
     show_all_types = request.args.get("show_all_types") == "true"
-    # Get search parameter
     search = request.args.get("search", "").strip()
+    class_id = request.args.get("class_id", type=int)
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = request.args.get("per_page", 50, type=int)
 
     db = get_db()
 
-    # Build the query based on filter
+    # Shared class filter fragment
+    class_where = " AND c.class_id = ?" if class_id else ""
+    class_select = ", c.photo_path, cl.name AS class_name, cl.is_team"
+    class_join = " LEFT JOIN class cl ON cl.id = c.class_id"
+
     if show_all_types and not hat_type:
-        # Show both classic and hybrid best scores for each contestant
-        query = """
-            SELECT c.name, t.average_attenuation, t.test_date, t.hat_type
+        query = f"""
+            SELECT c.name{class_select}, t.average_attenuation, t.test_date, t.hat_type
             FROM contestant c
             JOIN (
                 SELECT contestant_id, MAX(average_attenuation) as max_att, hat_type
@@ -301,76 +328,75 @@ def get_leaderboard():
             JOIN test_result t ON c.id = t.contestant_id
                 AND t.average_attenuation = best_scores.max_att
                 AND t.hat_type = best_scores.hat_type
-            WHERE LOWER(c.name) LIKE LOWER(?)
+            {class_join}
+            WHERE LOWER(c.name) LIKE LOWER(?){class_where}
             ORDER BY t.average_attenuation DESC
         """
-        params = [f"%{search}%"]
+        params = [f"%{search}%"] + ([class_id] if class_id else [])
     elif hat_type and hat_type.lower() in ["classic", "hybrid"]:
-        # Show best scores for the selected hat type for each contestant
-        query = """
-            SELECT c.name, t.average_attenuation, t.test_date, t.hat_type
+        query = f"""
+            SELECT c.name{class_select}, t.average_attenuation, t.test_date, t.hat_type
             FROM contestant c
             JOIN (
                 SELECT contestant_id, MAX(average_attenuation) as max_att
-                FROM test_result
-                WHERE hat_type = ?
+                FROM test_result WHERE hat_type = ?
                 GROUP BY contestant_id
             ) best_scores ON c.id = best_scores.contestant_id
             JOIN test_result t ON c.id = t.contestant_id
                 AND t.average_attenuation = best_scores.max_att
                 AND t.hat_type = ?
-            WHERE LOWER(c.name) LIKE LOWER(?)
+            {class_join}
+            WHERE LOWER(c.name) LIKE LOWER(?){class_where}
             ORDER BY t.average_attenuation DESC
         """
-        params = [hat_type.lower(), hat_type.lower(), f"%{search}%"]
+        params = [hat_type.lower(), hat_type.lower(), f"%{search}%"] + ([class_id] if class_id else [])
     else:
-        # Original query - showing only best scores regardless of hat type
-        query = """
-            SELECT c.name, t.average_attenuation, t.test_date, t.hat_type
+        query = f"""
+            SELECT c.name{class_select}, t.average_attenuation, t.test_date, t.hat_type
             FROM contestant c
             JOIN test_result t ON c.id = t.contestant_id
+            {class_join}
             WHERE t.is_best_score = 1
-            AND LOWER(c.name) LIKE LOWER(?)
+            AND LOWER(c.name) LIKE LOWER(?){class_where}
             ORDER BY t.average_attenuation DESC
         """
-        params = [f"%{search}%"]
+        params = [f"%{search}%"] + ([class_id] if class_id else [])
 
-    # Execute the query
-    leaderboard = db.execute(query, params).fetchall()
+    all_rows = db.execute(query, params).fetchall()
+    total = len(all_rows)
+    offset = (page - 1) * per_page
+    rows = all_rows[offset: offset + per_page]
 
-    # Convert to list of dictionaries for JSON serialization
-    leaderboard_data = []
-    for i, row in enumerate(leaderboard):
-        leaderboard_data.append(
-            {
-                "rank": i + 1,
-                "name": row["name"],
-                "average_attenuation": row["average_attenuation"],
-                "test_date": row["test_date"],
-                "hat_type": row["hat_type"] or "classic",  # Default to 'classic' if NULL
-            }
-        )
+    leaderboard_data = [
+        {
+            "rank": offset + i + 1,
+            "name": row["name"],
+            "photo_path": row["photo_path"],
+            "class_name": row["class_name"],
+            "is_team": bool(row["is_team"]) if row["is_team"] is not None else False,
+            "average_attenuation": row["average_attenuation"],
+            "test_date": row["test_date"],
+            "hat_type": row["hat_type"] or "classic",
+        }
+        for i, row in enumerate(rows)
+    ]
 
-    # Get all contestants for the dropdown, filtered by search if provided
     contestants_query = "SELECT id, name FROM contestant"
     contestants_params = []
     if search:
         contestants_query += " WHERE LOWER(name) LIKE LOWER(?)"
         contestants_params = [f"%{search}%"]
-
     contestants = db.execute(contestants_query, contestants_params).fetchall()
 
-    # Convert to list of dictionaries for JSON serialization
-    contestants_data = []
-    for row in contestants:
-        contestants_data.append(
-            {
-                "id": row["id"],
-                "name": row["name"],
-            }
-        )
-
-    return jsonify({"leaderboard": leaderboard_data, "contestants": contestants_data})
+    return jsonify(
+        {
+            "leaderboard": leaderboard_data,
+            "contestants": [{"id": r["id"], "name": r["name"]} for r in contestants],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }
+    )
 
 
 @bp.route("/contestants", methods=["POST"])
@@ -410,6 +436,12 @@ def add_contestant():
 
     # Get the ID of the newly inserted contestant
     new_contestant_id = cursor.lastrowid
+
+    # Handle optional photo upload
+    photo_path = _save_photo(request.files.get("photo"), new_contestant_id)
+    if photo_path:
+        db.execute("UPDATE contestant SET photo_path = ? WHERE id = ?", (photo_path, new_contestant_id))
+        db.commit()
 
     # Check if this is an AJAX request
     if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -1887,14 +1919,19 @@ def admin():
     search = request.args.get("search", "").strip()
 
     # Build the contestants query
-    contestants_query = "SELECT id, name, phone_number, email, notes, created FROM contestant"
+    contestants_query = """
+        SELECT c.id, c.name, c.phone_number, c.email, c.notes, c.photo_path, c.created,
+               c.class_id, cl.name AS class_name
+        FROM contestant c
+        LEFT JOIN class cl ON cl.id = c.class_id
+    """
     contestants_params = []
 
     if search:
-        contestants_query += " WHERE LOWER(name) LIKE LOWER(?)"
+        contestants_query += " WHERE LOWER(c.name) LIKE LOWER(?)"
         contestants_params.append(f"%{search}%")
 
-    contestants_query += " ORDER BY name"
+    contestants_query += " ORDER BY c.name"
 
     # Get all contestants
     contestants_rows = db.execute(contestants_query, contestants_params).fetchall()
@@ -1909,6 +1946,9 @@ def admin():
                 "phone_number": row["phone_number"],
                 "email": row["email"],
                 "notes": row["notes"],
+                "photo_path": row["photo_path"],
+                "class_id": row["class_id"],
+                "class_name": row["class_name"],
                 "created": format_datetime(row["created"]),
             }
         )
@@ -1951,7 +1991,18 @@ def admin():
             }
         )
 
-    return render_template("admin.html", contestants=contestants, test_results=test_results, search=search)
+    classes = db.execute("SELECT id, name, description, is_team FROM class ORDER BY name").fetchall()
+    classes_list = [
+        {"id": r["id"], "name": r["name"], "description": r["description"], "is_team": bool(r["is_team"])}
+        for r in classes
+    ]
+    return render_template(
+        "admin.html",
+        contestants=contestants,
+        test_results=test_results,
+        search=search,
+        classes=classes_list,
+    )
 
 
 @bp.route("/admin/contestants", methods=["POST"])
@@ -1963,23 +2014,21 @@ def add_contestant_admin():
     :rtype: Response
     """
     db = get_db()
-    data = request.get_json()
+    data = request.form
 
     try:
+        class_id = data.get("class_id") or None
         cursor = db.execute(
-            """
-            INSERT INTO contestant (name, phone_number, email, notes)
-            VALUES (?, ?, ?, ?)
-            """,
-            (
-                data.get("name", ""),
-                data.get("phone_number", ""),
-                data.get("email", ""),
-                data.get("notes", ""),
-            ),
+            "INSERT INTO contestant (name, phone_number, email, notes, class_id) VALUES (?, ?, ?, ?, ?)",
+            (data.get("name", ""), data.get("phone_number", ""), data.get("email", ""), data.get("notes", ""), class_id),
         )
         db.commit()
-        return jsonify({"success": True, "id": cursor.lastrowid})
+        new_id = cursor.lastrowid
+        photo_path = _save_photo(request.files.get("photo"), new_id)
+        if photo_path:
+            db.execute("UPDATE contestant SET photo_path = ? WHERE id = ?", (photo_path, new_id))
+            db.commit()
+        return jsonify({"success": True, "id": new_id})
     except Exception as e:
         db.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
@@ -1996,28 +2045,70 @@ def update_contestant_admin(contestant_id):
     :rtype: Response
     """
     db = get_db()
-    data = request.get_json()
+    data = request.form
 
     try:
+        class_id = data.get("class_id") or None
         db.execute(
-            """
-            UPDATE contestant
-            SET name = ?, phone_number = ?, email = ?, notes = ?
-            WHERE id = ?
-            """,
-            (
-                data.get("name", ""),
-                data.get("phone_number", ""),
-                data.get("email", ""),
-                data.get("notes", ""),
-                contestant_id,
-            ),
+            "UPDATE contestant SET name = ?, phone_number = ?, email = ?, notes = ?, class_id = ? WHERE id = ?",
+            (data.get("name", ""), data.get("phone_number", ""), data.get("email", ""), data.get("notes", ""), class_id, contestant_id),
         )
         db.commit()
+        photo_path = _save_photo(request.files.get("photo"), contestant_id)
+        if photo_path:
+            db.execute("UPDATE contestant SET photo_path = ? WHERE id = ?", (photo_path, contestant_id))
+            db.commit()
         return jsonify({"success": True})
     except Exception as e:
         db.rollback()
         return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/admin/classes", methods=["GET"])
+def list_classes():
+    db = get_db()
+    rows = db.execute("SELECT id, name, description, is_team FROM class ORDER BY name").fetchall()
+    return jsonify([{"id": r["id"], "name": r["name"], "description": r["description"], "is_team": bool(r["is_team"])} for r in rows])
+
+
+@bp.route("/admin/classes", methods=["POST"])
+def create_class():
+    db = get_db()
+    data = request.get_json()
+    try:
+        cursor = db.execute(
+            "INSERT INTO class (name, description, is_team) VALUES (?, ?, ?)",
+            (data.get("name", "").strip(), data.get("description", ""), bool(data.get("is_team", False))),
+        )
+        db.commit()
+        return jsonify({"success": True, "id": cursor.lastrowid})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/admin/classes/<int:class_id>", methods=["PUT"])
+def update_class(class_id):
+    db = get_db()
+    data = request.get_json()
+    try:
+        db.execute(
+            "UPDATE class SET name = ?, description = ?, is_team = ? WHERE id = ?",
+            (data.get("name", "").strip(), data.get("description", ""), bool(data.get("is_team", False)), class_id),
+        )
+        db.commit()
+        return jsonify({"success": True})
+    except Exception as e:
+        return jsonify({"success": False, "error": str(e)}), 500
+
+
+@bp.route("/admin/classes/<int:class_id>", methods=["DELETE"])
+def delete_class(class_id):
+    db = get_db()
+    # Unlink contestants before deleting
+    db.execute("UPDATE contestant SET class_id = NULL WHERE class_id = ?", (class_id,))
+    db.execute("DELETE FROM class WHERE id = ?", (class_id,))
+    db.commit()
+    return jsonify({"success": True})
 
 
 @bp.route("/admin/contestants/<int:contestant_id>", methods=["DELETE"])
@@ -2441,3 +2532,241 @@ def rf_attenuation():
     :rtype: str
     """
     return render_template("rf_attenuation_flyer.html")
+
+
+@bp.route("/api/billboard-config", methods=["GET"])
+def get_billboard_config():
+    """Return current billboard section visibility config."""
+    db = get_db()
+    rows = db.execute("SELECT key, value FROM settings WHERE key LIKE 'billboard_%'").fetchall()
+    return jsonify({row["key"]: row["value"] == "1" for row in rows})
+
+
+@bp.route("/admin/billboard-config", methods=["POST"])
+def save_billboard_config():
+    """Save billboard section visibility config."""
+    db = get_db()
+    data = request.get_json()
+    keys = ["billboard_show_classic", "billboard_show_hybrid", "billboard_show_spectrum", "billboard_show_votes", "billboard_vote_show_labels"]
+    for k in keys:
+        db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, "1" if data.get(k) else "0"))
+    db.commit()
+    return jsonify({"success": True})
+
+
+@bp.route("/api/top-voted")
+def get_top_voted():
+    """Return top voted contestants for the vote panel."""
+    db = get_db()
+    rows = db.execute("""
+        SELECT c.id, c.name, c.photo_path, COUNT(v.id) AS vote_count
+        FROM contestant c
+        LEFT JOIN votes v ON c.id = v.contestant_id
+        GROUP BY c.id
+        ORDER BY vote_count DESC, c.name
+        LIMIT 8
+    """).fetchall()
+    return jsonify([{"id": r["id"], "name": r["name"], "photo_path": r["photo_path"], "vote_count": r["vote_count"]} for r in rows])
+
+
+@bp.route("/design-billboard")
+def design_billboard():
+    """Fullscreen vote showcase billboard."""
+    db = get_db()
+    top_voted = db.execute("""
+        SELECT c.id, c.name, c.photo_path, COUNT(v.id) AS vote_count
+        FROM contestant c
+        LEFT JOIN votes v ON c.id = v.contestant_id
+        GROUP BY c.id
+        ORDER BY vote_count DESC, c.name
+    """).fetchall()
+    label_row = db.execute("SELECT value FROM settings WHERE key = 'billboard_vote_show_labels'").fetchone()
+    show_labels = label_row and label_row["value"] == "1"
+    embedded = request.args.get("embed") == "1"
+    return render_template("design-billboard.html", top_voted=top_voted, show_labels=show_labels, embedded=embedded)
+
+
+@bp.route("/vote", methods=["GET"])
+def vote_page():
+    """Voting kiosk — photo grid with vote buttons, filterable by class."""
+    db = get_db()
+    class_id = request.args.get("class_id", type=int)
+    page = max(1, request.args.get("page", 1, type=int))
+    per_page = 12
+
+    where = "WHERE c.class_id = ?" if class_id else ""
+    params = [class_id] if class_id else []
+
+    total = db.execute(
+        f"SELECT COUNT(*) AS n FROM contestant c {where}", params
+    ).fetchone()["n"]
+
+    contestants = db.execute(
+        f"""
+        SELECT c.id, c.name, c.photo_path, cl.name AS class_name, cl.is_team,
+               COUNT(v.id) AS vote_count
+        FROM contestant c
+        LEFT JOIN votes v ON c.id = v.contestant_id
+        LEFT JOIN class cl ON cl.id = c.class_id
+        {where}
+        GROUP BY c.id
+        ORDER BY c.name
+        LIMIT ? OFFSET ?
+        """,
+        params + [per_page, (page - 1) * per_page],
+    ).fetchall()
+
+    classes = db.execute("SELECT id, name, is_team FROM class ORDER BY name").fetchall()
+
+    return render_template(
+        "vote.html",
+        contestants=contestants,
+        classes=classes,
+        active_class=class_id,
+        page=page,
+        per_page=per_page,
+        total=total,
+    )
+
+
+@bp.route("/vote/<int:contestant_id>", methods=["POST"])
+def cast_vote(contestant_id):
+    """Record a vote for a contestant, return updated count."""
+    db = get_db()
+    if not db.execute("SELECT id FROM contestant WHERE id = ?", (contestant_id,)).fetchone():
+        return jsonify({"status": "error", "message": "Contestant not found"}), 404
+    db.execute("INSERT INTO votes (contestant_id) VALUES (?)", (contestant_id,))
+    db.commit()
+    count = db.execute("SELECT COUNT(*) AS c FROM votes WHERE contestant_id = ?", (contestant_id,)).fetchone()["c"]
+    return jsonify({"status": "success", "vote_count": count})
+
+
+@bp.route("/admin/votes")
+def admin_votes():
+    """Return vote tallies as JSON for the admin voting tab."""
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT c.id, c.name, c.photo_path,
+               COUNT(v.id) AS vote_count,
+               MAX(v.created) AS last_vote
+        FROM contestant c
+        LEFT JOIN votes v ON v.contestant_id = c.id
+        GROUP BY c.id
+        ORDER BY vote_count DESC, c.name
+        """
+    ).fetchall()
+    return jsonify(
+        [
+            {
+                "id": r["id"],
+                "name": r["name"],
+                "photo_path": r["photo_path"],
+                "vote_count": r["vote_count"],
+                "last_vote": str(r["last_vote"]) if r["last_vote"] else None,
+            }
+            for r in rows
+        ]
+    )
+
+
+@bp.route("/admin/export/csv")
+def export_csv():
+    """Export all contestants + best score + vote count as CSV."""
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT
+            c.id, c.name, c.phone_number, c.email, c.notes, c.photo_path, c.created,
+            cl.name AS class_name, cl.is_team,
+            tr.average_attenuation AS best_attenuation,
+            tr.hat_type,
+            tr.test_date,
+            COUNT(v.id) AS vote_count
+        FROM contestant c
+        LEFT JOIN class cl ON cl.id = c.class_id
+        LEFT JOIN test_result tr ON tr.contestant_id = c.id AND tr.is_best_score = 1
+        LEFT JOIN votes v ON v.contestant_id = c.id
+        GROUP BY c.id
+        ORDER BY c.name
+        """
+    ).fetchall()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["id", "name", "class", "is_team", "phone_number", "email", "notes", "created",
+         "best_attenuation_dB", "hat_type", "test_date", "vote_count", "photo_url"]
+    )
+    base = request.host_url.rstrip("/")
+    for r in rows:
+        photo_url = f"{base}/static/{r['photo_path']}" if r["photo_path"] else ""
+        writer.writerow(
+            [r["id"], r["name"], r["class_name"] or "", r["is_team"] or 0,
+             r["phone_number"], r["email"], r["notes"],
+             r["created"], r["best_attenuation"], r["hat_type"], r["test_date"],
+             r["vote_count"], photo_url]
+        )
+
+    output = buf.getvalue()
+    return Response(
+        output,
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tinfoilhat_results.csv"},
+    )
+
+
+@bp.route("/admin/export/test-results")
+def export_test_results_csv():
+    """Export all test results (one row per frequency measurement) as CSV."""
+    db = get_db()
+    rows = db.execute(
+        """
+        SELECT
+            tr.id AS result_id, c.name AS contestant_name,
+            tr.test_date, tr.average_attenuation, tr.is_best_score, tr.hat_type,
+            td.frequency, td.baseline_level, td.hat_level, td.attenuation
+        FROM test_result tr
+        JOIN contestant c ON c.id = tr.contestant_id
+        LEFT JOIN test_data td ON td.test_result_id = tr.id
+        ORDER BY tr.test_date DESC, tr.id, td.frequency
+        """
+    ).fetchall()
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(
+        ["result_id", "contestant_name", "test_date", "average_attenuation_dB",
+         "is_best_score", "hat_type", "frequency_MHz", "baseline_dBm", "hat_dBm", "attenuation_dB"]
+    )
+    for r in rows:
+        writer.writerow([
+            r["result_id"], r["contestant_name"], r["test_date"],
+            r["average_attenuation"], r["is_best_score"], r["hat_type"],
+            r["frequency"], r["baseline_level"], r["hat_level"], r["attenuation"],
+        ])
+
+    return Response(
+        buf.getvalue(),
+        mimetype="text/csv",
+        headers={"Content-Disposition": "attachment; filename=tinfoilhat_test_results.csv"},
+    )
+
+
+@bp.route("/admin/export/images")
+def export_images():
+    """Return a ZIP of all contestant hat photos."""
+    uploads_dir = current_app.config["UPLOAD_FOLDER"]
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as zf:
+        if os.path.isdir(uploads_dir):
+            for fname in os.listdir(uploads_dir):
+                fpath = os.path.join(uploads_dir, fname)
+                if os.path.isfile(fpath):
+                    zf.write(fpath, fname)
+    buf.seek(0)
+    return Response(
+        buf,
+        mimetype="application/zip",
+        headers={"Content-Disposition": "attachment; filename=tinfoilhat_photos.zip"},
+    )
