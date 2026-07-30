@@ -124,6 +124,7 @@ celerybeat.pid
 
 # Environments
 .vscode
+.claude
 .env
 .venv
 env/
