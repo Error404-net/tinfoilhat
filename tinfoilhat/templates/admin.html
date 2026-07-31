@@ -236,11 +236,36 @@
                 justify-content: flex-end;
                 margin-bottom: 10px;
             }
-            
-            h1 {
-                margin-top: 5px;
+            h1 { margin-top: 5px; }
+
+            /* Scrollable tables on small screens */
+            .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+            /* Hide low-priority table columns */
+            .col-hide-mobile { display: none; }
+
+            /* Full-width modals */
+            .modal-content {
+                width: 95vw !important;
+                margin: 5% auto !important;
+                padding: 16px !important;
             }
+
+            /* Stack tab buttons */
+            .tab { display: flex; flex-wrap: wrap; }
+            .tab button { flex: 1 1 auto; font-size: 0.85rem; padding: 8px 6px; }
         }
+
+        /* Inline admin message bar */
+        #admin-msg {
+            display: none;
+            padding: 10px 16px;
+            border-radius: 4px;
+            margin-bottom: 14px;
+            font-weight: bold;
+        }
+        #admin-msg.success { background: var(--success-background); color: var(--success-text); }
+        #admin-msg.error   { background: var(--error-background);   color: var(--error-text); }
         
         /* Header layout */
         .container > h1 {
@@ -328,12 +353,14 @@
             <a href="/vote" class="nav-link">Vote</a>
         </div>
 
-        <div class="tab">
-            <button class="tablinks active" onclick="openTab(event, 'contestants')">Contestants</button>
-            <button class="tablinks" onclick="openTab(event, 'test-results')">Test Results</button>
-            <button class="tablinks" onclick="openTab(event, 'billboard-settings')">Billboard</button>
-            <button class="tablinks" onclick="openTab(event, 'voting'); loadVotes()">Voting</button>
-            <button class="tablinks" onclick="openTab(event, 'classes')">Classes</button>
+        <div id="admin-msg" role="alert" aria-live="polite"></div>
+
+        <div class="tab" role="tablist">
+            <button class="tablinks active" role="tab" aria-selected="true"  aria-controls="contestants"       onclick="openTab(event, 'contestants')">Contestants</button>
+            <button class="tablinks"        role="tab" aria-selected="false" aria-controls="test-results"      onclick="openTab(event, 'test-results')">Test Results</button>
+            <button class="tablinks"        role="tab" aria-selected="false" aria-controls="billboard-settings" onclick="openTab(event, 'billboard-settings')">Billboard</button>
+            <button class="tablinks"        role="tab" aria-selected="false" aria-controls="voting"            onclick="openTab(event, 'voting'); loadVotes()">Voting</button>
+            <button class="tablinks"        role="tab" aria-selected="false" aria-controls="classes"           onclick="openTab(event, 'classes')">Classes</button>
         </div>
 
         <div id="contestants" class="tabcontent" style="display: block;">
@@ -347,24 +374,25 @@
                 </div>
                 <button onclick="showAddContestantModal()">Add New Contestant</button>
             </div>
+            <div class="table-scroll">
             <table id="contestants-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th class="col-hide-mobile">ID</th>
                         <th>Photo</th>
                         <th>Name</th>
                         <th>Class</th>
-                        <th>Phone</th>
-                        <th>Email</th>
-                        <th>Notes</th>
-                        <th>Created</th>
+                        <th class="col-hide-mobile">Phone</th>
+                        <th class="col-hide-mobile">Email</th>
+                        <th class="col-hide-mobile">Notes</th>
+                        <th class="col-hide-mobile">Created</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>
                     {% for contestant in contestants %}
                     <tr>
-                        <td>{{ contestant.id }}</td>
+                        <td class="col-hide-mobile">{{ contestant.id }}</td>
                         <td>
                             {% if contestant.photo_path %}
                                 <img src="{{ url_for('static', filename=contestant.photo_path) }}" style="width:48px;height:48px;object-fit:cover;border-radius:4px;">
@@ -374,10 +402,10 @@
                         </td>
                         <td>{{ contestant.name }}</td>
                         <td style="color:#888; font-size:0.85rem;">{{ contestant.class_name or '—' }}</td>
-                        <td>{{ contestant.phone_number }}</td>
-                        <td>{{ contestant.email }}</td>
-                        <td>{{ contestant.notes }}</td>
-                        <td>{{ contestant.created }}</td>
+                        <td class="col-hide-mobile">{{ contestant.phone_number }}</td>
+                        <td class="col-hide-mobile">{{ contestant.email }}</td>
+                        <td class="col-hide-mobile">{{ contestant.notes }}</td>
+                        <td class="col-hide-mobile">{{ contestant.created }}</td>
                         <td>
                             <button class="edit-btn" onclick='showEditContestantModal({{ contestant | tojson }})'>Edit</button>
                             <button class="delete-btn" onclick="deleteContestant({{ contestant.id }})">Delete</button>
@@ -386,6 +414,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div id="test-results" class="tabcontent">
@@ -394,14 +423,15 @@
                 <button onclick="showAddTestResultModal()">Add New Test Result</button>
                 <a href="/admin/export/test-results" style="text-decoration:none; padding:7px 14px; background:#2196F3; color:#fff; border-radius:4px; font-size:0.9rem;">⬇ Export CSV</a>
             </div>
+            <div class="table-scroll">
             <table id="test-results-table">
                 <thead>
                     <tr>
-                        <th>ID</th>
+                        <th class="col-hide-mobile">ID</th>
                         <th>Contestant</th>
-                        <th>Test Date</th>
-                        <th>Avg Attenuation</th>
-                        <th>Best Score</th>
+                        <th class="col-hide-mobile">Test Date</th>
+                        <th>Avg Atten.</th>
+                        <th>Best</th>
                         <th>Hat Type</th>
                         <th>Actions</th>
                     </tr>
@@ -409,18 +439,18 @@
                 <tbody>
                     {% for result in test_results %}
                     <tr>
-                        <td>{{ result.id }}</td>
+                        <td class="col-hide-mobile">{{ result.id }}</td>
                         <td>{{ result.contestant_name }}</td>
-                        <td>{{ result.test_date }}</td>
+                        <td class="col-hide-mobile">{{ result.test_date }}</td>
                         <td>{{ result.average_attenuation }}</td>
                         <td>{% if result.is_best_score %}Yes{% else %}No{% endif %}</td>
                         <td>{{ result.hat_type }}</td>
                         <td>
                             <button class="edit-btn" onclick="showEditTestResultModal({
-                                id: {{ result.id }}, 
-                                contestant_id: {{ result.contestant_id }}, 
-                                average_attenuation: {{ result.average_attenuation }}, 
-                                is_best_score: {{ 'true' if result.is_best_score else 'false' }}, 
+                                id: {{ result.id }},
+                                contestant_id: {{ result.contestant_id }},
+                                average_attenuation: {{ result.average_attenuation }},
+                                is_best_score: {{ 'true' if result.is_best_score else 'false' }},
                                 hat_type: '{{ result.hat_type | default('classic', true) }}'
                             })">Edit</button>
                             <button class="delete-btn" onclick="deleteTestResult({{ result.id }})">Delete</button>
@@ -429,6 +459,7 @@
                     {% endfor %}
                 </tbody>
             </table>
+            </div>
         </div>
 
         <div id="billboard-settings" class="tabcontent">
@@ -864,6 +895,15 @@
                 });
             });
 
+            // Inline status message (replaces alert())
+            function showAdminMsg(msg, isError = true) {
+                const el = document.getElementById('admin-msg');
+                el.textContent = msg;
+                el.className = isError ? 'error' : 'success';
+                el.style.display = 'block';
+                setTimeout(() => { el.style.display = 'none'; }, 5000);
+            }
+
             // API Functions
             async function addContestant(event) {
                 event.preventDefault();
@@ -878,11 +918,11 @@
                         closeAddContestantModal();
                         window.location.reload();
                     } else {
-                        alert('Error adding contestant');
+                        showAdminMsg('Error adding contestant');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error adding contestant');
+                    showAdminMsg('Error adding contestant');
                 }
             }
 
@@ -900,11 +940,11 @@
                         closeEditContestantModal();
                         window.location.reload();
                     } else {
-                        alert('Error updating contestant');
+                        showAdminMsg('Error updating contestant');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error updating contestant');
+                    showAdminMsg('Error updating contestant');
                 }
             }
 
@@ -921,11 +961,11 @@
                     if (response.ok) {
                         window.location.reload();
                     } else {
-                        alert('Error deleting contestant');
+                        showAdminMsg('Error deleting contestant');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error deleting contestant');
+                    showAdminMsg('Error deleting contestant');
                 }
             }
 
@@ -951,11 +991,11 @@
                         closeAddTestResultModal();
                         window.location.reload();
                     } else {
-                        alert('Error adding test result');
+                        showAdminMsg('Error adding test result');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error adding test result');
+                    showAdminMsg('Error adding test result');
                 }
             }
 
@@ -982,11 +1022,11 @@
                         closeEditTestResultModal();
                         window.location.reload();
                     } else {
-                        alert('Error updating test result');
+                        showAdminMsg('Error updating test result');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error updating test result');
+                    showAdminMsg('Error updating test result');
                 }
             }
 
@@ -1003,11 +1043,11 @@
                     if (response.ok) {
                         window.location.reload();
                     } else {
-                        alert('Error deleting test result');
+                        showAdminMsg('Error deleting test result');
                     }
                 } catch (error) {
                     console.error('Error:', error);
-                    alert('Error deleting test result');
+                    showAdminMsg('Error deleting test result');
                 }
             }
 
@@ -1042,7 +1082,7 @@
                         msg.style.display = 'block';
                         setTimeout(() => msg.style.display = 'none', 3000);
                     }
-                } catch (e) { alert('Error saving settings'); }
+                } catch (e) { showAdminMsg('Error saving settings'); }
             }
 
             loadBillboardConfig();
@@ -1078,7 +1118,7 @@
                     }),
                 });
                 if ((await res.json()).success) { closeAddClassModal(); window.location.reload(); }
-                else alert('Error saving class');
+                else showAdminMsg('Error saving class');
             }
 
             async function submitEditClass(e) {
@@ -1094,7 +1134,7 @@
                     }),
                 });
                 if ((await res.json()).success) { closeEditClassModal(); window.location.reload(); }
-                else alert('Error updating class');
+                else showAdminMsg('Error updating class');
             }
 
             async function deleteClass(id, btn) {
@@ -1102,7 +1142,7 @@
                 btn.disabled = true;
                 const res = await fetch(`/admin/classes/${id}`, { method: 'DELETE' });
                 if ((await res.json()).success) window.location.reload();
-                else { alert('Error deleting class'); btn.disabled = false; }
+                else { showAdminMsg('Error deleting class'); btn.disabled = false; }
             }
 
             async function loadVotes() {

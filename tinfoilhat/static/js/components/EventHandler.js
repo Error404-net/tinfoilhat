@@ -69,9 +69,12 @@ class EventHandler {
                 }
             };
             
+            this.eventSource.onopen = () => { window.setSseStatus?.(true); };
+
             this.eventSource.onerror = (e) => {
+                window.setSseStatus?.(false);
                 if (this.errorHandler) {
-                    this.errorHandler.handleError('EventHandler', 'eventSource.onerror', 
+                    this.errorHandler.handleError('EventHandler', 'eventSource.onerror',
                         'SSE connection error, falling back to polling...', 'warning');
                 } else {
                     console.log('SSE connection error, falling back to polling...');
@@ -118,9 +121,9 @@ class EventHandler {
                     setTimeout(() => {
                         try {
                             this.frequencyEventSource = new EventSource('/frequency-stream');
-                            // Reset reconnect attempts on successful connection
                             this.frequencyEventSource.onopen = () => {
                                 this.reconnectAttempts = 0;
+                                window.setSseStatus?.(true);
                                 console.log('Frequency stream reconnection successful');
                             };
                             

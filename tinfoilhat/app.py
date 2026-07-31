@@ -5,6 +5,7 @@ This module provides the create_app factory function that initializes and config
 the Flask application.
 """
 
+import logging
 import os
 from contextlib import suppress
 
@@ -15,12 +16,16 @@ from tinfoilhat.db import (
     close_db,
     ensure_class_table_exists,
     ensure_contestant_class_column_exists,
+    ensure_indexes_exist,
     ensure_measurement_cache_exists,
     ensure_photo_path_column_exists,
     ensure_settings_table_exists,
     ensure_votes_table_exists,
     init_db,
 )
+
+logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+logger = logging.getLogger(__name__)
 
 
 def create_app(test_config=None):
@@ -60,7 +65,7 @@ def create_app(test_config=None):
     if not os.path.exists(db_path):
         with app.app_context():
             init_db()
-            print(f"Created new database at {db_path}")
+            logger.info("Created new database at %s", db_path)
     else:
         with app.app_context():
             ensure_measurement_cache_exists()
@@ -69,7 +74,8 @@ def create_app(test_config=None):
             ensure_settings_table_exists()
             ensure_class_table_exists()
             ensure_contestant_class_column_exists()
-            print(f"Validated database schema at {db_path}")
+            ensure_indexes_exist()
+            logger.info("Validated database schema at %s", db_path)
 
     # Register database close function to be called when cleaning up app context
     app.teardown_appcontext(close_db)

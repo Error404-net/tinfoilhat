@@ -47,6 +47,11 @@ CREATE TABLE IF NOT EXISTS votes (
   FOREIGN KEY (contestant_id) REFERENCES contestant (id)
 );
 
+-- Indexes for common query patterns
+CREATE INDEX IF NOT EXISTS idx_test_result_contestant ON test_result(contestant_id);
+CREATE INDEX IF NOT EXISTS idx_test_result_best       ON test_result(is_best_score);
+CREATE INDEX IF NOT EXISTS idx_votes_contestant       ON votes(contestant_id);
+
 -- Measurement cache table (for in-progress measurements persistence between app restarts)
 CREATE TABLE measurement_cache (
   id INTEGER PRIMARY KEY AUTOINCREMENT,

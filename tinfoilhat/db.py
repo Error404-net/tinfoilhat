@@ -5,12 +5,15 @@ This module handles database connections and schema initialization.
 """
 
 import datetime
+import logging
 import sqlite3
 from pathlib import Path
 
 import click
 from flask import current_app, g
 from flask.cli import with_appcontext
+
+logger = logging.getLogger(__name__)
 
 
 def adapt_datetime_iso(val):
@@ -125,7 +128,7 @@ def ensure_hat_type_column_exists():
         # Add hat_type column with default value 'classic'
         db.execute("ALTER TABLE test_result ADD COLUMN hat_type TEXT DEFAULT 'classic'")
         db.commit()
-        print("Added hat_type column to test_result table")
+        logger.info("Added hat_type column to test_result table")
 
 
 def ensure_settings_table_exists():
@@ -203,6 +206,25 @@ def ensure_contestant_class_column_exists():
         db.commit()
 
 
+def ensure_indexes_exist():
+    """Create query-optimization indexes if missing."""
+    db = get_db()
+    stmts = [
+        "CREATE INDEX IF NOT EXISTS idx_test_result_contestant ON test_result(contestant_id)",
+        "CREATE INDEX IF NOT EXISTS idx_test_result_best       ON test_result(is_best_score)",
+        "CREATE INDEX IF NOT EXISTS idx_votes_contestant       ON votes(contestant_id)",
+    ]
+    # idx_contestant_class only if column exists
+    try:
+        db.execute("SELECT class_id FROM contestant LIMIT 1")
+        stmts.append("CREATE INDEX IF NOT EXISTS idx_contestant_class ON contestant(class_id)")
+    except Exception:
+        pass
+    for stmt in stmts:
+        db.execute(stmt)
+    db.commit()
+
+
 def init_db():
     """
     Initialize the database with schema.
@@ -220,6 +242,7 @@ def init_db():
     ensure_settings_table_exists()
     ensure_class_table_exists()
     ensure_contestant_class_column_exists()
+    ensure_indexes_exist()
 
 
 @click.command("init-db")

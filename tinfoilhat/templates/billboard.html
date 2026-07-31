@@ -488,6 +488,7 @@
     <div class="terminal-effects"></div>
     <div class="terminal-header">
         <span>TINFOIL_HAT OS v2.0</span>
+        <span id="sse-badge" style="padding:2px 8px; border-radius:3px; font-size:0.85em; background:#1a1a1a; color:#888; border:1px solid #555;">CONNECTING</span>
         <span id="terminal-time"></span>
     </div>
     <div class="terminal-command">
@@ -638,6 +639,14 @@
 
         applyBillboardConfig();
         setInterval(applyBillboardConfig, 15000);
+
+        window.setSseStatus = function(connected) {
+            const b = document.getElementById('sse-badge');
+            if (!b) return;
+            b.textContent  = connected ? 'LIVE' : 'DISCONNECTED';
+            b.style.color  = connected ? '#33ff33' : '#ff5555';
+            b.style.border = connected ? '1px solid #33ff33' : '1px solid #ff5555';
+        };
     </script>
 </body>
 </html> 
