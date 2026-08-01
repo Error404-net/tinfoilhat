@@ -2541,6 +2541,18 @@ def kids_guide():
     return render_template("kids_attenuation_flyer.html")
 
 
+@bp.route("/testing")
+def testing_process():
+    """Display the testing process flyer."""
+    return render_template("testing_process_flyer.html")
+
+
+@bp.route("/testing/print")
+def testing_process_print():
+    """Display the print-friendly testing process flyer."""
+    return render_template("testing_process_print_flyer.html")
+
+
 @bp.route("/flyers")
 def flyers():
     """Display the printable flyers index."""

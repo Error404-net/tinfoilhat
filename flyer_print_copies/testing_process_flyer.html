@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Testing Works - Tinfoil Hat Competition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Share+Tech+Mono&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <style>
+        body {
+            background-color: #000;
+            color: #33ff33;
+            font-family: 'IBM Plex Mono', monospace;
+            margin: 0;
+            padding: 10px;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .rf-card {
+            background-color: #111;
+            border: 2px solid #33ff33;
+            border-radius: 5px;
+            padding: 15px;
+            width: 850px;
+            height: 1100px;
+            box-shadow: inset 0 0 10px rgba(51, 255, 51, 0.3);
+            position: relative;
+            overflow: hidden;
+            box-sizing: border-box;
+        }
+
+        .rf-card::before {
+            content: "TESTING_PROCESS.TXT";
+            position: absolute;
+            top: 0;
+            left: 0;
+            background: #33ff33;
+            color: #000;
+            font-size: 1em;
+            padding: 2px 10px;
+            font-family: 'Press Start 2P', cursive;
+            font-weight: bold;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            text-align: center;
+            margin: 28px 0 6px 0;
+            text-shadow: 0 0 5px #33ff33;
+            font-size: 1.8vw;
+            line-height: 1.5;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.1vw;
+            color: #99ffaa;
+            margin-bottom: 16px;
+        }
+
+        .step {
+            margin-bottom: 11px;
+            padding: 9px 12px;
+            border: 1px solid rgba(51, 255, 51, 0.35);
+            border-radius: 3px;
+            background: rgba(51, 255, 51, 0.06);
+            position: relative;
+        }
+
+        .step-header {
+            display: flex;
+            align-items: baseline;
+            gap: 10px;
+            margin-bottom: 5px;
+        }
+
+        .step-num {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1vw;
+            color: #000;
+            background: #33ff33;
+            padding: 2px 7px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .step h2 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1vw;
+            color: #bbffbb;
+            margin: 0;
+        }
+
+        .step p {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.15vw;
+            line-height: 1.45;
+            margin: 0;
+            color: #ccffcc;
+        }
+
+        /* Score formula box */
+        .formula-box {
+            border: 1px solid #33ff33;
+            border-radius: 3px;
+            background: rgba(51, 255, 51, 0.1);
+            padding: 10px 14px;
+            margin: 11px 0;
+            text-align: center;
+        }
+
+        .formula-box .formula {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 1.15vw;
+            color: #33ff33;
+            line-height: 2;
+        }
+
+        .formula-box .formula-note {
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.05vw;
+            color: #99ffaa;
+            margin-top: 4px;
+        }
+
+        /* Band breakdown table */
+        .band-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.05vw;
+        }
+
+        .band-table th {
+            color: #33ff33;
+            border-bottom: 1px solid rgba(51,255,51,0.4);
+            padding: 4px 8px;
+            text-align: left;
+            font-weight: normal;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.85vw;
+        }
+
+        .band-table td {
+            padding: 4px 8px;
+            color: #ccffcc;
+            border-bottom: 1px solid rgba(51,255,51,0.12);
+        }
+
+        .band-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .note-box {
+            border: 1px dashed rgba(51,255,51,0.4);
+            border-radius: 3px;
+            padding: 7px 12px;
+            margin-top: 11px;
+            font-family: 'Share Tech Mono', monospace;
+            font-size: 1.05vw;
+            color: #99ee99;
+            line-height: 1.5;
+        }
+
+        .note-box span {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.8vw;
+            color: #33ff33;
+            margin-right: 6px;
+        }
+    </style>
+</head>
+<body>
+    <div class="rf-card">
+        <h1>HOW TESTING WORKS</h1>
+        <p class="subtitle">From scan to score &mdash; what happens when you put on the hat</p>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">01</span>
+                <h2>50 FREQUENCIES ARE SELECTED</h2>
+            </div>
+            <p>The system scans across <strong>50 frequencies from 2 MHz to 5,900 MHz</strong>.
+            These include real-world signals you encounter every day: FM radio, cellular bands,
+            WiFi (2.4 &amp; 5 GHz), Bluetooth, GPS, and more. The rest are evenly spaced
+            across the spectrum to catch anything in between.</p>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">02</span>
+                <h2>BASELINE SCAN &mdash; NO HAT</h2>
+            </div>
+            <p>First, the HackRF SDR measures the <strong>ambient RF power at each frequency
+            with no hat present</strong>. This is the baseline &mdash; the natural background
+            signal level the hat will be tested against. Multiple readings are taken per
+            frequency and averaged for stability.</p>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">03</span>
+                <h2>HAT SCAN &mdash; WITH HAT</h2>
+            </div>
+            <p>The hat is placed on the mannequin head (which contains the receiving antenna).
+            The same 50 frequencies are measured again. A well-shielded hat will show
+            <strong>lower power readings</strong> &mdash; the signal couldn't get through.</p>
+        </div>
+
+        <div class="formula-box">
+            <div class="formula">
+                ATTENUATION (dB) = BASELINE &minus; HAT READING
+            </div>
+            <div class="formula-note">
+                Positive = hat blocked signal &nbsp;|&nbsp; Negative = hat reflected/amplified signal (bad)
+            </div>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">04</span>
+                <h2>YOUR SCORE IS CALCULATED</h2>
+            </div>
+            <p>Attenuation is calculated at each valid frequency, then <strong>averaged across
+            all 50 frequencies</strong>. That average &mdash; in dB &mdash; is your score.
+            Higher is better. Scores are also broken down by frequency band:</p>
+            <table class="band-table">
+                <thead>
+                    <tr>
+                        <th>Band</th>
+                        <th>Range</th>
+                        <th>Includes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>HF</td><td>2 &ndash; 30 MHz</td><td>Shortwave, CB radio</td></tr>
+                    <tr><td>VHF</td><td>30 &ndash; 300 MHz</td><td>FM radio, weather, air traffic</td></tr>
+                    <tr><td>UHF</td><td>300 MHz &ndash; 3 GHz</td><td>Cellular, WiFi 2.4 GHz, GPS, Bluetooth</td></tr>
+                    <tr><td>SHF</td><td>3 &ndash; 5.9 GHz</td><td>WiFi 5 GHz, 5G mid-band</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">05</span>
+                <h2>BEST SCORE IS TRACKED</h2>
+            </div>
+            <p>Contestants can run <strong>multiple tests</strong>. Only your best score per
+            hat type (Classic or Hybrid) appears on the leaderboard. Classic and Hybrid
+            categories are ranked separately.</p>
+        </div>
+
+        <div class="note-box">
+            <span>NOTE</span>
+            Negative attenuation is real &mdash; foil can reflect signals back and create
+            resonance that briefly <em>amplifies</em> certain frequencies. It drags your
+            average down. Smooth, gapless coverage across the whole head avoids this.
+        </div>
+    </div>
+</body>
+</html>

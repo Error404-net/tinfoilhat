@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>How Testing Works - Tinfoil Hat Competition</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+
+        @page {
+            size: letter;
+            margin: 0.45in;
+        }
+
+        body {
+            background: #fff;
+            color: #111;
+            font-family: Arial, Helvetica, sans-serif;
+            font-size: 12px;
+            line-height: 1.45;
+        }
+
+        @media screen {
+            body {
+                background: #e0e0e0;
+                display: flex;
+                justify-content: center;
+                padding: 24px;
+            }
+            .page {
+                background: #fff;
+                width: 7.5in;
+                min-height: 10.1in;
+                padding: 0.45in;
+                box-shadow: 0 2px 16px rgba(0,0,0,0.18);
+            }
+        }
+
+        @media print {
+            body { background: #fff; }
+            .page { padding: 0; }
+            * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        }
+
+        .top-banner {
+            background: #111;
+            color: #fff;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 7px;
+            letter-spacing: 2px;
+            padding: 5px 12px;
+            margin-bottom: 10px;
+        }
+
+        h1 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 13px;
+            text-align: center;
+            line-height: 1.7;
+            margin-bottom: 2px;
+        }
+
+        .subtitle {
+            text-align: center;
+            font-size: 11px;
+            color: #555;
+            font-style: italic;
+            margin-bottom: 12px;
+        }
+
+        .step {
+            border: 1.5px solid #ccc;
+            border-radius: 5px;
+            padding: 8px 11px;
+            margin-bottom: 8px;
+            background: #fafafa;
+        }
+
+        .step-header {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .step-num {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 6px;
+            color: #fff;
+            background: #111;
+            padding: 2px 6px;
+            border-radius: 2px;
+            flex-shrink: 0;
+        }
+
+        .step h2 {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 6.5px;
+            letter-spacing: 0.5px;
+            color: #111;
+        }
+
+        .step p {
+            font-size: 11.5px;
+            color: #222;
+            line-height: 1.5;
+        }
+
+        .formula-box {
+            border: 2px solid #111;
+            border-radius: 4px;
+            padding: 8px 12px;
+            margin: 8px 0;
+            text-align: center;
+            background: #f5f5f5;
+        }
+
+        .formula {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 7.5px;
+            color: #111;
+            line-height: 2;
+        }
+
+        .formula-note {
+            font-size: 10px;
+            color: #555;
+            margin-top: 3px;
+        }
+
+        .band-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 6px;
+            font-size: 11px;
+        }
+
+        .band-table th {
+            background: #111;
+            color: #fff;
+            padding: 4px 8px;
+            text-align: left;
+            font-family: 'Press Start 2P', cursive;
+            font-size: 5.5px;
+            letter-spacing: 0.5px;
+        }
+
+        .band-table td {
+            padding: 4px 8px;
+            border-bottom: 1px solid #ddd;
+            color: #222;
+        }
+
+        .band-table tr:last-child td { border-bottom: none; }
+        .band-table tr:nth-child(even) td { background: #f9f9f9; }
+
+        .note-box {
+            border: 1.5px dashed #aaa;
+            border-radius: 4px;
+            padding: 7px 11px;
+            margin-top: 8px;
+            font-size: 11px;
+            color: #444;
+            line-height: 1.5;
+            background: #fafafa;
+        }
+
+        .note-box strong {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 6px;
+            color: #111;
+            margin-right: 5px;
+            letter-spacing: 0.5px;
+        }
+    </style>
+</head>
+<body>
+    <div class="page">
+        <div class="top-banner">TINFOIL HAT COMPETITION</div>
+
+        <h1>HOW TESTING WORKS</h1>
+        <p class="subtitle">From scan to score &mdash; what happens when you put on the hat</p>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">01</span>
+                <h2>50 FREQUENCIES ARE SELECTED</h2>
+            </div>
+            <p>The system scans across <strong>50 frequencies from 2 MHz to 5,900 MHz</strong>.
+            These include real-world signals you encounter every day: FM radio, cellular bands,
+            WiFi (2.4 &amp; 5 GHz), Bluetooth, GPS, and more. The rest are evenly spaced
+            across the spectrum to catch anything in between.</p>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">02</span>
+                <h2>BASELINE SCAN &mdash; NO HAT</h2>
+            </div>
+            <p>First, the HackRF SDR measures the <strong>ambient RF power at each frequency
+            with no hat present</strong>. This is the baseline &mdash; the natural background
+            signal level the hat will be tested against. Multiple readings are taken per
+            frequency and averaged for stability.</p>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">03</span>
+                <h2>HAT SCAN &mdash; WITH HAT</h2>
+            </div>
+            <p>The hat is placed on the mannequin head (which contains the receiving antenna).
+            The same 50 frequencies are measured again. A well-shielded hat will show
+            <strong>lower power readings</strong> &mdash; the signal couldn't get through.</p>
+        </div>
+
+        <div class="formula-box">
+            <div class="formula">ATTENUATION (dB) = BASELINE &minus; HAT READING</div>
+            <p class="formula-note">Positive = hat blocked signal &nbsp;&nbsp;|&nbsp;&nbsp; Negative = hat reflected or amplified signal (bad)</p>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">04</span>
+                <h2>YOUR SCORE IS CALCULATED</h2>
+            </div>
+            <p>Attenuation is calculated at each valid frequency, then <strong>averaged across
+            all 50 frequencies</strong>. That average &mdash; in dB &mdash; is your score.
+            Higher is better. Scores are also broken down by frequency band:</p>
+            <table class="band-table">
+                <thead>
+                    <tr>
+                        <th>Band</th>
+                        <th>Range</th>
+                        <th>Includes</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td><strong>HF</strong></td><td>2 &ndash; 30 MHz</td><td>Shortwave, CB radio</td></tr>
+                    <tr><td><strong>VHF</strong></td><td>30 &ndash; 300 MHz</td><td>FM radio, weather, air traffic</td></tr>
+                    <tr><td><strong>UHF</strong></td><td>300 MHz &ndash; 3 GHz</td><td>Cellular, WiFi 2.4 GHz, GPS, Bluetooth</td></tr>
+                    <tr><td><strong>SHF</strong></td><td>3 &ndash; 5.9 GHz</td><td>WiFi 5 GHz, 5G mid-band</td></tr>
+                </tbody>
+            </table>
+        </div>
+
+        <div class="step">
+            <div class="step-header">
+                <span class="step-num">05</span>
+                <h2>BEST SCORE IS TRACKED</h2>
+            </div>
+            <p>Contestants can run <strong>multiple tests</strong>. Only your best score per
+            hat type (Classic or Hybrid) appears on the leaderboard. Classic and Hybrid
+            categories are ranked separately.</p>
+        </div>
+
+        <div class="note-box">
+            <strong>NOTE</strong>
+            Negative attenuation is real &mdash; foil can reflect signals back and create resonance
+            that briefly <em>amplifies</em> certain frequencies. It drags your average down.
+            Smooth, gapless coverage across the whole head avoids this.
+        </div>
+    </div>
+</body>
+</html>
