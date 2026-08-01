@@ -411,6 +411,7 @@ def add_contestant():
     phone_number = request.form.get("phone_number", "")
     email = request.form.get("email", "")
     notes = request.form.get("notes", "")
+    class_id = request.form.get("class_id") or None
 
     if not name:
         if request.headers.get("X-Requested-With") == "XMLHttpRequest":
@@ -429,8 +430,8 @@ def add_contestant():
         return redirect(url_for("tinfoilhat.index"))
 
     cursor = db.execute(
-        "INSERT INTO contestant (name, phone_number, email, notes) VALUES (?, ?, ?, ?)",
-        (name, phone_number, email, notes),
+        "INSERT INTO contestant (name, phone_number, email, notes, class_id) VALUES (?, ?, ?, ?, ?)",
+        (name, phone_number, email, notes, class_id),
     )
     db.commit()
 
@@ -2532,6 +2533,18 @@ def rf_attenuation():
     :rtype: str
     """
     return render_template("rf_attenuation_flyer.html")
+
+
+@bp.route("/kids")
+def kids_guide():
+    """Display the kids' RF attenuation guide flyer."""
+    return render_template("kids_attenuation_flyer.html")
+
+
+@bp.route("/flyers")
+def flyers():
+    """Display the printable flyers index."""
+    return render_template("flyers.html")
 
 
 @bp.route("/api/billboard-config", methods=["GET"])

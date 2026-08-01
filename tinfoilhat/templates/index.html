@@ -537,7 +537,8 @@
             <a href="/admin" class="nav-link">Admin Panel</a> |
             <a href="/billboard" class="nav-link">Billboard</a> |
             <a href="/design-billboard" class="nav-link">Vote Showcase</a> |
-            <a href="/vote" class="nav-link">Vote</a>
+            <a href="/vote" class="nav-link">Vote</a> |
+            <a href="/flyers" class="nav-link">Flyers</a>
         </div>
     </div>
     
@@ -1633,7 +1634,7 @@
             <h2>Contestant Registration</h2>
             <form id="new-contestant-form" action="{{ url_for('tinfoilhat.add_contestant') }}" method="post" enctype="multipart/form-data">
                 <div class="form-group">
-                    <label for="name">Team Name:</label>
+                    <label for="name">Name:</label>
                     <input type="text" id="name" name="name" required>
                     <small style="display: block; margin-top: 5px; color: #666;">Contestant names must be unique</small>
                 </div>
@@ -1648,6 +1649,15 @@
                 <div class="form-group">
                     <label for="notes">Notes:</label>
                     <textarea id="notes" name="notes" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="reg_class_id">Class / Category (optional):</label>
+                    <select id="reg_class_id" name="class_id">
+                        <option value="">— None —</option>
+                        {% for cls in classes %}
+                        <option value="{{ cls.id }}">{{ cls.name }}{% if cls.is_team %} (Team){% endif %}</option>
+                        {% endfor %}
+                    </select>
                 </div>
                 <div class="form-group">
                     <label>Hat Photo (optional):</label>
