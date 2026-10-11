@@ -27,6 +27,20 @@ try {
         $Record = Get-Content $_.FullName -Raw | ConvertFrom-Json
         $Package = "$($Record.name)-$($Record.version)-$($Record.build)"
         $Info = Join-Path $PackageCache "$Package\info"
+        # Micromamba can use a URL-namespaced package cache or a configured pkgs_dirs.
+        # Installed package records identify the actual extraction directory.
+        if ($Record.PSObject.Properties['link'] -and $Record.link.PSObject.Properties['source']) {
+            $LinkedInfo = Join-Path $Record.link.source "info"
+            if (Test-Path $LinkedInfo) { $Info = $LinkedInfo }
+        }
+        if (-not (Test-Path $Info)) {
+            Get-ChildItem $PackageCache -Filter index.json -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                $Index = Get-Content $_.FullName -Raw | ConvertFrom-Json
+                if ($Index.name -eq $Record.name -and $Index.version -eq $Record.version -and $Index.build -eq $Record.build) {
+                    $Info = $_.DirectoryName
+                }
+            }
+        }
         if (Test-Path "$Info\licenses") {
             Copy-Item $Info "$Stage\licenses\$Package" -Recurse -Force
             $LicenseCount++
