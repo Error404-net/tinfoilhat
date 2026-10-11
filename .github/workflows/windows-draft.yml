@@ -4,7 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: ['desktop/windows-release-*']
-    paths: ['.github/workflows/windows-draft.yml']
 
 permissions:
   contents: write
@@ -13,6 +12,7 @@ permissions:
 jobs:
   attach:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - uses: actions/checkout@v4
         with:
@@ -23,13 +23,35 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
-            --branch "$GITHUB_REF_NAME" --status success --limit 1 \
-            --json databaseId,headSha > /tmp/verified-build.json
-          BUILD_RUN_ID=$(jq -er '.[0].databaseId' /tmp/verified-build.json)
-          BUILD_SHA=$(jq -er '.[0].headSha' /tmp/verified-build.json)
-          # Only workflow changes may differ from the build's source commit.
-          git diff --exit-code "$BUILD_SHA" HEAD -- . ':!.github/workflows'
+          VERIFIED=false
+          for ATTEMPT in $(seq 1 80); do
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
+              --branch "$GITHUB_REF_NAME" --status success --limit 1 \
+              --json databaseId,headSha > /tmp/verified-build.json
+            BUILD_RUN_ID=$(jq -r '.[0].databaseId // empty' /tmp/verified-build.json)
+            BUILD_SHA=$(jq -r '.[0].headSha // empty' /tmp/verified-build.json)
+            # An older artifact is reusable only when its application source matches.
+            if [ -n "$BUILD_SHA" ] && git diff --quiet "$BUILD_SHA" HEAD -- . ':!.github/workflows'; then
+              VERIFIED=true
+              break
+            fi
+            gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
+              --branch "$GITHUB_REF_NAME" --commit "$GITHUB_SHA" --limit 1 \
+              --json conclusion > /tmp/current-build.json
+            CONCLUSION=$(jq -r '.[0].conclusion // empty' /tmp/current-build.json)
+            case "$CONCLUSION" in
+              failure|cancelled|timed_out|action_required)
+                echo "::error::The Windows build did not pass ($CONCLUSION); no release assets were changed."
+                exit 1
+                ;;
+            esac
+            echo "Waiting for a successful Windows build of the current application source ($ATTEMPT/80)."
+            sleep 15
+          done
+          if [ "$VERIFIED" != true ]; then
+            echo "::error::No verified Windows installer matching the current application source became available."
+            exit 1
+          fi
           echo "run_id=$BUILD_RUN_ID" >> "$GITHUB_OUTPUT"
           echo "sha=$BUILD_SHA" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@v4
@@ -42,13 +64,34 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BUILD_SHA: ${{ steps.build.outputs.sha }}
+          BUILD_RUN_ID: ${{ steps.build.outputs.run_id }}
         run: |
           set -euo pipefail
           (cd dist && sha256sum -c SHA256SUMS.txt)
           RELEASE_TAG=v0.1.0-desktop.1
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft > /tmp/release.json; then
             jq -e '.isDraft == true' /tmp/release.json
-            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --target "$BUILD_SHA"
+            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > /tmp/release-notes.md
+            python3 - <<'PY'
+          import os
+          import re
+          from pathlib import Path
+          notes_file = Path('/tmp/release-notes.md')
+          notes = notes_file.read_text()
+          source = f"Source commit: `{os.environ['BUILD_SHA']}` on `{os.environ['GITHUB_REF_NAME']}`."
+          if re.search(r'^Source commit:.*$', notes, flags=re.M):
+              notes = re.sub(r'^Source commit:.*$', lambda _: source, notes, flags=re.M)
+          else:
+              notes += '\n\n' + source
+          build_url = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['BUILD_RUN_ID']}"
+          notes = re.sub(r'https://github.com/[^\s)]+/actions/runs/\d+', build_url, notes)
+          fix_note = 'WebView2 setup reuses an installed runtime and verifies availability after an updater error. The actual installer, reinstallation, and installed application window were tested on Windows.'
+          if fix_note not in notes:
+              notes += '\n\n' + fix_note + '\n'
+          notes_file.write_text(notes)
+          PY
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --target "$BUILD_SHA" --notes-file /tmp/release-notes.md
           else
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
               --draft --prerelease --target "$BUILD_SHA" \
