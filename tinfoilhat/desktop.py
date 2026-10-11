@@ -44,6 +44,7 @@ def desktop_app(data_dir):
             "DATABASE": str(data_dir / "tinfoilhat.sqlite"),
             "UPLOAD_FOLDER": str(data_dir / "uploads"),
             "SECRET_KEY": key_path.read_text(encoding="utf-8"),
+            "DESKTOP_MODE": True,
         },
         instance_path=str(data_dir),
     )
@@ -153,6 +154,43 @@ def main(argv=None):
                         "typeof window.Chart === 'function' && typeof window.jQuery?.fn?.select2 === 'function'"
                     ):
                         raise RuntimeError("The desktop browser dependencies did not load.")
+
+                    def wait_for_page(path):
+                        deadline = time.monotonic() + 20
+                        while time.monotonic() < deadline:
+                            try:
+                                if window.evaluate_js(
+                                    f"location.pathname === {json.dumps(path)} && document.readyState === 'complete'"
+                                ):
+                                    return
+                            except Exception:
+                                # WebView can reject script execution during a document transition.
+                                pass
+                            time.sleep(0.1)
+                        raise RuntimeError(f"Desktop navigation did not reach {path}.")
+
+                    for path in ("/vote", "/billboard", "/design-billboard"):
+                        window.load_url(server.url + path)
+                        wait_for_page(path)
+                        if not window.evaluate_js("""(() => {
+                            const button = document.getElementById('back-to-admin');
+                            if (!button || new URL(button.href).pathname !== '/admin') return false;
+                            const rect = button.getBoundingClientRect();
+                            return rect.width >= 44 && rect.height >= 44 && rect.top >= 0 &&
+                                rect.bottom <= innerHeight &&
+                                Boolean(document.elementFromPoint(rect.x + rect.width / 2,
+                                    rect.y + rect.height / 2)?.closest('#back-to-admin'));
+                        })()"""):
+                            raise RuntimeError(f"The Back to Admin button is not usable on {path}.")
+                        window.evaluate_js("document.getElementById('back-to-admin').click()")
+                        wait_for_page("/admin")
+                    window.resize(360, 640)
+                    window.load_url(server.url + "/vote")
+                    wait_for_page("/vote")
+                    window.evaluate_js("""document.dispatchEvent(new KeyboardEvent('keydown', {
+                        key: 'Backspace', bubbles: true, cancelable: true
+                    }))""")
+                    wait_for_page("/admin")
                 except Exception as error:
                     gui_errors.append(error)
                 finally:
@@ -163,6 +201,7 @@ def main(argv=None):
                 gui="edgechromium" if sys.platform == "win32" else None,
                 storage_path=str(data_dir / "webview"),
                 private_mode=False,
+                icon=str(Path(app.root_path) / "static" / "img" / "tinfoil-wizard-hat.png"),
             )
             if gui_errors:
                 raise gui_errors[0]

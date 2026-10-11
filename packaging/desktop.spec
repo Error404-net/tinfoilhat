@@ -48,5 +48,6 @@ pyz = PYZ(a.pure)
 exe = EXE(
     pyz, a.scripts, [], exclude_binaries=True, name="TinfoilHat",
     debug=False, strip=False, upx=False, console=False,
+    icon=str(root / 'tinfoilhat' / 'static' / 'img' / 'tinfoil-wizard-hat.ico'),
 )
 coll = COLLECT(exe, a.binaries, a.datas, strip=False, upx=False, name="TinfoilHat")

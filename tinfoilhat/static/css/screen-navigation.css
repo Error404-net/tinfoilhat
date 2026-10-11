@@ -1,0 +1,85 @@
+body.has-screen-navigation {
+    box-sizing: border-box;
+    padding-top: 64px;
+}
+
+.screen-navigation {
+    position: fixed;
+    inset: 0 0 auto;
+    height: 64px;
+    box-sizing: border-box;
+    z-index: 2000;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 8px 16px;
+    background: #0a0a0a;
+    border-bottom: 1px solid #33ff33;
+    color: #33ff33;
+    font: 14px/1.3 'Courier New', monospace;
+}
+
+.screen-navigation__back,
+.screen-navigation__menu summary {
+    box-sizing: border-box;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    min-height: 44px;
+    padding: 8px 12px;
+    border: 1px solid #33ff33;
+    border-radius: 6px;
+    background: #101b10;
+    color: #33ff33;
+    text-decoration: none;
+    cursor: pointer;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+.screen-navigation a:hover,
+.screen-navigation summary:hover {
+    background: #193219;
+    color: #fff;
+}
+
+.screen-navigation a:focus-visible,
+.screen-navigation summary:focus-visible {
+    outline: 3px solid #fff;
+    outline-offset: 2px;
+}
+
+.screen-navigation__menu summary { list-style: none; }
+.screen-navigation__menu summary::-webkit-details-marker { display: none; }
+.screen-navigation__links {
+    position: absolute;
+    top: 60px;
+    right: 16px;
+    min-width: 180px;
+    padding: 6px;
+    border: 1px solid #33ff33;
+    border-radius: 6px;
+    background: #0a0a0a;
+    box-shadow: 0 8px 20px #0008;
+}
+.screen-navigation__links a {
+    display: block;
+    padding: 14px;
+    color: #33ff33;
+    text-decoration: none;
+    border-radius: 3px;
+}
+
+body.has-screen-navigation .billboard-container,
+body.has-screen-navigation .photo-grid,
+body.has-screen-navigation .empty {
+    height: calc(100vh - 64px);
+}
+body.has-screen-navigation .terminal-header { top: 74px; }
+
+@media print {
+    .screen-navigation { display: none; }
+    body.has-screen-navigation { padding-top: 0; }
+}

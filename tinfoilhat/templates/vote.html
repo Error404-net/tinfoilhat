@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" href="{{ url_for('static', filename='img/tinfoil-wizard-hat.ico') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Vote for Your Favorite Hat!</title>
@@ -153,7 +154,8 @@
         }
     </style>
 </head>
-<body>
+<body class="has-screen-navigation">
+{% include 'components/screen_navigation.html' %}
 
 <header>
     <h1>&gt; VOTE FOR YOUR FAVORITE HAT &lt;</h1>

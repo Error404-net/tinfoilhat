@@ -1,0 +1,17 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/screen-navigation.css') }}">
+<nav class="screen-navigation" aria-label="Screen navigation">
+    <a id="back-to-admin" class="screen-navigation__back" href="{{ url_for('tinfoilhat.admin') }}" title="Back to Admin (Alt+Left or Backspace)">
+        <span aria-hidden="true">&#8592;</span> Back to Admin
+    </a>
+    <details class="screen-navigation__menu">
+        <summary>Screens <span aria-hidden="true">&#9662;</span></summary>
+        <div class="screen-navigation__links">
+            <a href="{{ url_for('tinfoilhat.index') }}">Home</a>
+            <a href="{{ url_for('tinfoilhat.vote_page') }}">Voting Kiosk</a>
+            <a href="{{ url_for('tinfoilhat.billboard') }}">RF Billboard</a>
+            <a href="{{ url_for('tinfoilhat.design_billboard') }}">Vote Showcase</a>
+            <a href="{{ url_for('tinfoilhat.flyers') }}">Flyers</a>
+        </div>
+    </details>
+</nav>
+<script src="{{ url_for('static', filename='js/screen-navigation.js') }}" defer></script>

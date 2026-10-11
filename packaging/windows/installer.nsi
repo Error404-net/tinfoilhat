@@ -32,6 +32,8 @@ RequestExecutionLevel user
 SetCompressor /SOLID lzma
 
 !define MUI_ABORTWARNING
+!define MUI_ICON "..\..\tinfoilhat\static\img\tinfoil-wizard-hat.ico"
+!define MUI_UNICON "..\..\tinfoilhat\static\img\tinfoil-wizard-hat.ico"
 !define MUI_FINISHPAGE_RUN "$INSTDIR\TinfoilHat.exe"
 !insertmacro MUI_PAGE_WELCOME
 !insertmacro MUI_PAGE_LICENSE "..\..\LICENSE"
@@ -105,12 +107,13 @@ Section "Tinfoil Hat Competition" SEC_APP
     File /oname=Windows-Readme.md "..\..\docs\windows-desktop.md"
     WriteUninstaller "$INSTDIR\Uninstall.exe"
     CreateDirectory "$SMPROGRAMS\Tinfoil Hat Competition"
-    CreateShortcut "$SMPROGRAMS\Tinfoil Hat Competition\Tinfoil Hat Competition.lnk" "$INSTDIR\TinfoilHat.exe"
+    CreateShortcut "$SMPROGRAMS\Tinfoil Hat Competition\Tinfoil Hat Competition.lnk" "$INSTDIR\TinfoilHat.exe" "" "$INSTDIR\_internal\tinfoilhat\static\img\tinfoil-wizard-hat.ico" 0
     CreateShortcut "$SMPROGRAMS\Tinfoil Hat Competition\Uninstall.lnk" "$INSTDIR\Uninstall.exe"
     WriteRegStr HKCU "Software\TinfoilHat" "InstallDir" "$INSTDIR"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TinfoilHat" "DisplayName" "Tinfoil Hat Competition"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TinfoilHat" "DisplayVersion" "0.1.0"
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TinfoilHat" "Publisher" "Tinfoil Hat Competition"
+    WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TinfoilHat" "DisplayIcon" '"$INSTDIR\TinfoilHat.exe",0'
     WriteRegStr HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TinfoilHat" "UninstallString" '"$INSTDIR\Uninstall.exe"'
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TinfoilHat" "NoModify" 1
     WriteRegDWORD HKCU "Software\Microsoft\Windows\CurrentVersion\Uninstall\TinfoilHat" "NoRepair" 1

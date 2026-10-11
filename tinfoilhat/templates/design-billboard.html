@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" href="{{ url_for('static', filename='img/tinfoil-wizard-hat.ico') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tinfoil Hat — Popular Vote</title>
@@ -157,16 +158,10 @@
         .empty p { color: #555; font-size: 0.7em; font-family: 'VT323', monospace; }
     </style>
 </head>
-<body>
+<body{% if not embedded %} class="has-screen-navigation"{% endif %}>
 
 {% if not embedded %}
-<nav class="nav">
-    <a href="/billboard">RF Billboard</a>
-    <span>|</span>
-    <a href="/vote">Vote</a>
-    <span>|</span>
-    <a href="/admin">Admin</a>
-</nav>
+{% include 'components/screen_navigation.html' %}
 <div id="countdown"></div>
 {% endif %}
 

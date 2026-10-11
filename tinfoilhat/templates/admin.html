@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" href="{{ url_for('static', filename='img/tinfoil-wizard-hat.ico') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tinfoil Hat Admin</title>
@@ -489,8 +490,8 @@
             <hr style="margin: 20px 0; border-color: var(--table-border);">
             <h3>Quick Links</h3>
             <p>
-                <a href="/billboard" target="_blank" class="nav-link">RF Competition Billboard</a> &nbsp;|&nbsp;
-                <a href="/design-billboard" target="_blank" class="nav-link">Vote Showcase Billboard</a>
+                <a href="/billboard" target="{{ '_self' if config.get('DESKTOP_MODE') else '_blank' }}" class="nav-link">RF Competition Billboard</a> &nbsp;|&nbsp;
+                <a href="/design-billboard" target="{{ '_self' if config.get('DESKTOP_MODE') else '_blank' }}" class="nav-link">Vote Showcase Billboard</a>
             </p>
         </div>
 
@@ -550,8 +551,8 @@
         <div id="voting" class="tabcontent">
             <h2>Vote Tallies</h2>
             <p style="margin-bottom:12px;">
-                <a href="/vote" target="_blank" class="nav-link">Open Voting Kiosk</a> &nbsp;|&nbsp;
-                <a href="/design-billboard" target="_blank" class="nav-link">Vote Showcase</a>
+                <a href="/vote" target="{{ '_self' if config.get('DESKTOP_MODE') else '_blank' }}" class="nav-link">Open Voting Kiosk</a> &nbsp;|&nbsp;
+                <a href="/design-billboard" target="{{ '_self' if config.get('DESKTOP_MODE') else '_blank' }}" class="nav-link">Vote Showcase</a>
             </p>
             <div style="margin-bottom:16px; display:flex; gap:10px; flex-wrap:wrap;">
                 <a href="/admin/export/csv" class="btn" style="text-decoration:none; padding:7px 14px; background:#2196F3; color:#fff; border-radius:4px; font-size:0.9rem;">⬇ Export CSV</a>
@@ -1189,4 +1190,4 @@
         </script>
     </div>
 </body>
-</html> 
+</html>

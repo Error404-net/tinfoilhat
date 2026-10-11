@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+    <link rel="icon" href="{{ url_for('static', filename='img/tinfoil-wizard-hat.ico') }}">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tinfoil Hat Competition - Billboard</title>
@@ -482,8 +483,8 @@
         }
     </style>
 </head>
-<body>
-    <!-- Removed navigation links as requested -->
+<body class="has-screen-navigation">
+    {% include 'components/screen_navigation.html' %}
     
     <div class="terminal-effects"></div>
     <div class="terminal-header">

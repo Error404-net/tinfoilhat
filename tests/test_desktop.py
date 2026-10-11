@@ -68,3 +68,12 @@ def test_real_server_readiness_and_shutdown(tmp_path):
     assert not server.thread.is_alive()
     with pytest.raises(URLError):
         urlopen(server.url + "/leaderboard", timeout=1)
+
+
+def test_desktop_kiosk_links_stay_in_application_window(tmp_path):
+    app = desktop_app(tmp_path)
+    response = app.test_client().get("/admin")
+    assert response.status_code == 200
+    assert b'href="/vote" target="_self"' in response.data
+    assert b'href="/billboard" target="_self"' in response.data
+    assert b'href="/design-billboard" target="_self"' in response.data
