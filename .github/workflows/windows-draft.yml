@@ -1,0 +1,58 @@
+name: Attach Windows installer to draft release
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['desktop/windows-release-*']
+    paths: ['.github/workflows/windows-draft.yml']
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  attach:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Select verified Windows build
+        id: build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          gh run list --repo "$GITHUB_REPOSITORY" --workflow windows-release.yml \
+            --branch "$GITHUB_REF_NAME" --status success --limit 1 \
+            --json databaseId,headSha > /tmp/verified-build.json
+          BUILD_RUN_ID=$(jq -er '.[0].databaseId' /tmp/verified-build.json)
+          BUILD_SHA=$(jq -er '.[0].headSha' /tmp/verified-build.json)
+          # Only workflow changes may differ from the build's source commit.
+          git diff --exit-code "$BUILD_SHA" HEAD -- . ':!.github/workflows'
+          echo "run_id=$BUILD_RUN_ID" >> "$GITHUB_OUTPUT"
+          echo "sha=$BUILD_SHA" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@v4
+        with:
+          name: TinfoilHat-Windows-x64
+          path: dist
+          github-token: ${{ github.token }}
+          run-id: ${{ steps.build.outputs.run_id }}
+      - name: Verify and attach installer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_SHA: ${{ steps.build.outputs.sha }}
+        run: |
+          set -euo pipefail
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          RELEASE_TAG=v0.1.0-desktop.1
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft > /tmp/release.json; then
+            jq -e '.isDraft == true' /tmp/release.json
+          else
+            gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --draft --prerelease --target "$BUILD_SHA" \
+              --title "Tinfoil Hat Desktop 0.1.0 (Windows x64)" \
+              --notes "Standalone Windows desktop installer with bundled Python, app libraries, HackRF tools, and the Microsoft WebView2 offline runtime installer. Live RF measurements require a HackRF One and a compatible WinUSB driver."
+          fi
+          gh release upload "$RELEASE_TAG" dist/TinfoilHat-Setup-x64.exe dist/SHA256SUMS.txt \
+            --repo "$GITHUB_REPOSITORY" --clobber
