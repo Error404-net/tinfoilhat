@@ -64,34 +64,21 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           BUILD_SHA: ${{ steps.build.outputs.sha }}
-          BUILD_RUN_ID: ${{ steps.build.outputs.run_id }}
         run: |
           set -euo pipefail
           (cd dist && sha256sum -c SHA256SUMS.txt)
           RELEASE_TAG=v0.1.0-desktop.1
           if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json isDraft > /tmp/release.json; then
             jq -e '.isDraft == true' /tmp/release.json
-            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --json body --jq '.body' > /tmp/release-notes.md
-            python3 - <<'PY'
-          import os
-          import re
-          from pathlib import Path
-          notes_file = Path('/tmp/release-notes.md')
-          notes = notes_file.read_text()
-          source = f"Source commit: `{os.environ['BUILD_SHA']}` on `{os.environ['GITHUB_REF_NAME']}`."
-          if re.search(r'^Source commit:.*$', notes, flags=re.M):
-              notes = re.sub(r'^Source commit:.*$', lambda _: source, notes, flags=re.M)
-          else:
-              notes += '\n\n' + source
-          build_url = f"https://github.com/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['BUILD_RUN_ID']}"
-          notes = re.sub(r'https://github.com/[^\s)]+/actions/runs/\d+', build_url, notes)
-          fix_note = 'WebView2 setup reuses an installed runtime and verifies availability after an updater error. The actual installer, reinstallation, and installed application window were tested on Windows.'
-          if fix_note not in notes:
-              notes += '\n\n' + fix_note + '\n'
-          notes_file.write_text(notes)
-          PY
-            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-              --target "$BUILD_SHA" --notes-file /tmp/release-notes.md
+            # Updating a tag target containing workflow changes can require a
+            # permission the Actions token cannot obtain. Set draft metadata
+            # through an authorized API client before attaching replacement bytes.
+            gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --json targetCommitish --jq '.targetCommitish' > /tmp/release-target.txt
+            if [ "$(cat /tmp/release-target.txt)" != "$BUILD_SHA" ]; then
+              echo "::error::Update the draft release target to $BUILD_SHA before attaching this build."
+              exit 1
+            fi
           else
             gh release create "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
               --draft --prerelease --target "$BUILD_SHA" \
