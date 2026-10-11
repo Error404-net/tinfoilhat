@@ -30,7 +30,9 @@ jobs:
             --channel conda-forge
             --strict-channel-priority
             hackrf=2026.01.3
-          cache-environment: true
+          # Restoring only the environment omits extracted package recipes/licenses.
+          # Recreate the small tools environment from cached, verified downloads.
+          cache-environment: false
           cache-downloads: true
       - name: Build and test desktop installer
         shell: pwsh
