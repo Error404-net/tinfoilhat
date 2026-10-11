@@ -9,6 +9,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: windows-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     runs-on: windows-2022
@@ -31,11 +35,22 @@ jobs:
       - name: Build and test desktop installer
         shell: pwsh
         run: |
-          if (-not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) {
-            choco install nsis --yes --no-progress
-            if ($LASTEXITCODE -ne 0) { throw "NSIS installation failed." }
+          New-Item -ItemType Directory -Force build | Out-Null
+          Start-Transcript -Path build/windows-build.log
+          try {
+            if (-not (Test-Path "${env:ProgramFiles(x86)}\NSIS\makensis.exe")) {
+              choco install nsis --yes --no-progress
+              if ($LASTEXITCODE -ne 0) { throw "NSIS installation failed." }
+            }
+            ./packaging/windows/build.ps1 -HackRfPrefix "$env:MAMBA_ROOT_PREFIX\envs\hackrf-tools"
+          } catch {
+            $Details = (Get-Content build/windows-build.log -Tail 80 | Out-String) + ($_ | Out-String)
+            $Details = $Details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')
+            Write-Output "::error title=Windows installer build failed::$Details"
+            throw
+          } finally {
+            Stop-Transcript
           }
-          ./packaging/windows/build.ps1 -HackRfPrefix "$env:MAMBA_ROOT_PREFIX\envs\hackrf-tools"
       - name: Generate checksum
         shell: pwsh
         run: |
