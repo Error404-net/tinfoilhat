@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Tinfoil Hat Competition - Billboard</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/billboard.css') }}">
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+    <script src="{{ url_for('static', filename='vendor/chart.umd.min.js') }}"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap');
         
@@ -649,4 +649,4 @@
         };
     </script>
 </body>
-</html> 
+</html>

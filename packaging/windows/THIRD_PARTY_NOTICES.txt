@@ -1,0 +1,27 @@
+Tinfoil Hat Competition includes third-party software.
+
+Python and Python libraries are bundled by PyInstaller. Python uses the PSF license;
+Flask/Jinja2/Werkzeug/Click/ItsDangerous/MarkupSafe use BSD licenses; NumPy uses BSD;
+Waitress uses ZPL-2.1; pywebview uses BSD-3-Clause; pythonnet uses MIT;
+platformdirs uses MIT. Distribution metadata and license files are included.
+PyInstaller uses GPL with a bootloader exception permitting application distribution.
+
+Browser UI libraries:
+  jQuery 3.7.1: MIT, https://github.com/jquery/jquery/tree/3.7.1
+  Select2 4.1.0-rc.0: MIT, https://github.com/select2/select2/tree/4.1.0-rc.0
+  Chart.js 4.3.0: MIT, https://github.com/chartjs/Chart.js/tree/v4.3.0
+The vendored files retain their license notices.
+
+HackRF 2026.01.3 and its native dependencies are supplied by conda-forge.
+Package records, accompanying license files, build recipes, patches, and verified
+corresponding GPL/LGPL source archives are included in licenses/hackrf.
+HackRF tools use GPL-2.0; source and build recipes are available at:
+  https://github.com/greatscottgadgets/hackrf/tree/v2026.01.3
+  https://github.com/conda-forge/hackrf-feedstock
+FFTW uses GPL-2.0-or-later; source: https://www.fftw.org/download.html
+libusb uses LGPL-2.1-or-later; source: https://github.com/libusb/libusb
+The native tools run as separate command-line processes.
+
+Microsoft WebView2 Evergreen Runtime is installed separately by Microsoft's
+signed offline installer. Its Microsoft license terms apply. The runtime
+receives updates independently through Microsoft's Evergreen update mechanism.

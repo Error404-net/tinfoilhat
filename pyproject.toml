@@ -19,6 +19,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+desktop = [
+    "pywebview==6.1",
+    "waitress==3.0.2",
+    "platformdirs>=4.0,<5",
+]
 dev = [
     "tox>=3.24.0",
     "black>=22.1.0",
@@ -49,4 +54,4 @@ ignore = ["BLE001", "B904", "C901"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-python_files = "test_*.py" 
+python_files = "test_*.py"

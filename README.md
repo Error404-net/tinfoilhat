@@ -199,6 +199,9 @@ The application is tested primarily with Python 3.13. While the codebase should 
 
 ## Software Setup
 
+For the standalone Windows app and EXE build instructions, see
+[Windows desktop application](docs/windows-desktop.md).
+
 1. **Create and activate a virtual environment**:
    ```
    python -m venv venv
@@ -208,6 +211,7 @@ The application is tested primarily with Python 3.13. While the codebase should 
 2. **Install the package and dependencies**:
    ```
    pip install -e .
+   python packaging/fetch_assets.py
    ```
 
 3. **Initialize the database**:

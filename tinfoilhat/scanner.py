@@ -197,7 +197,13 @@ class Scanner:
         for attempt in range(1, 4):
             try:
                 # Run hackrf_info command to check device
-                result = subprocess.run(["hackrf_info"], capture_output=True, text=True, timeout=5)
+                result = subprocess.run(
+                    ["hackrf_info"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5,
+                    creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+                )
 
                 if "HackRF One" in result.stdout:
                     print("HackRF One detected successfully")
@@ -382,7 +388,13 @@ class Scanner:
         try:
             # Run the command with a timeout
             print(f"Measuring at {freq_mhz} MHz with LNA gain {lna_gain} dB, VGA gain {vga_gain} dB")
-            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)  # Increased timeout
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=10,
+                creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+            )
 
             if result.returncode != 0:
                 error_msg = f"Error measuring frequency {freq_mhz} MHz: return code {result.returncode}"

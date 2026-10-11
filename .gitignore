@@ -67,6 +67,7 @@ instance/
 
 # Uploaded contestant photos — runtime data, not source
 tinfoilhat/static/uploads/
+tinfoilhat/static/vendor/
 
 # Scrapy stuff:
 .scrapy
