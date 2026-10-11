@@ -45,6 +45,7 @@ jobs:
               if ($LASTEXITCODE -ne 0) { throw "NSIS installation failed." }
             }
             ./packaging/windows/build.ps1 -HackRfPrefix "$env:MAMBA_ROOT_PREFIX\envs\hackrf-tools"
+            ./packaging/windows/test-installer.ps1 -Setup "$PWD\dist\TinfoilHat-Setup-x64.exe"
           } catch {
             $Details = (Get-Content build/windows-build.log -Tail 80 | Out-String) + ($_ | Out-String)
             $Details = $Details.Replace('%', '%25').Replace("`r", '%0D').Replace("`n", '%0A')

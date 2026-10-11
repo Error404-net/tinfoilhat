@@ -18,6 +18,9 @@ are not supported by this installer.
 - Microsoft's signed WebView2 Evergreen **offline** runtime installer.
 
 The installer does not need to download dependencies on the user's machine.
+Setup reuses an existing compatible WebView2 runtime. If it must install the
+runtime, setup checks that it is available afterward rather than rejecting an
+updater return code when the required runtime is already present.
 Google Fonts remain optional online resources; system fonts work offline.
 Windows and WebView2 may subsequently check for their own updates.
 
@@ -70,6 +73,9 @@ python -m venv .venv
 The build verifies downloads, stages native tools and license files, bundles the
 app with PyInstaller, validates the signed WebView2 installer, runs backend and
 GUI smoke checks, and builds the NSIS installer. It fails if required checks fail.
+CI also tests the actual installer, reinstallation, and launching the installed
+application. Regression fixtures cover a preinstalled runtime and updater error
+`0x80040828`, including refusing to continue if the runtime remains unavailable.
 The result is `dist\TinfoilHat-Setup-x64.exe` with a printed SHA-256 checksum.
 
 ## Develop without packaging

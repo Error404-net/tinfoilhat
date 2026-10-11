@@ -68,10 +68,8 @@ try {
         throw "The WebView2 installer does not have a valid Microsoft signature."
     }
     # Exercise the runtime and native window on the build machine before shipping.
-    $RuntimeProcess = Start-Process $Runtime -ArgumentList "/silent", "/install" -Wait -PassThru
-    if ($RuntimeProcess.ExitCode -notin @(0, 3010, -2147219198)) {
-        throw "WebView2 setup failed with exit code $($RuntimeProcess.ExitCode)."
-    }
+    . "$PSScriptRoot\webview2.ps1"
+    Install-WebView2Runtime -Installer $Runtime
     foreach ($Mode in @("smoke-test", "gui-smoke-test")) {
         $Report = "$Repo\build\$Mode.json"
         Remove-Item $Report -Force -ErrorAction SilentlyContinue
