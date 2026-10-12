@@ -205,6 +205,9 @@
             top: 4px;
         }
     </style>
+    {% if config.get('DESKTOP_MODE') and not embed %}
+    <script src="{{ url_for('static', filename='js/desktop-navigation.js') }}" defer></script>
+    {% endif %}
 </head>
 <body>
     <div class="page">

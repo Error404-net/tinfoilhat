@@ -153,6 +153,9 @@
             font-size: 1.1rem;
         }
     </style>
+    {% if config.get('DESKTOP_MODE') and not embed %}
+    <script src="{{ url_for('static', filename='js/desktop-navigation.js') }}" defer></script>
+    {% endif %}
 </head>
 <body class="has-screen-navigation">
 {% include 'components/screen_navigation.html' %}

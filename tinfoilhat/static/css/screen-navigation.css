@@ -83,3 +83,9 @@ body.has-screen-navigation .terminal-header { top: 74px; }
     .screen-navigation { display: none; }
     body.has-screen-navigation { padding-top: 0; }
 }
+
+@media (max-width: 480px) {
+    .screen-navigation { gap: 4px; padding: 8px; font-size: 12px; }
+    .screen-navigation__back,
+    .screen-navigation__menu summary { padding: 8px 6px; font-size: inherit; }
+}

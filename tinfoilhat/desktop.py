@@ -86,6 +86,52 @@ class DesktopServer:
             self.thread.join(timeout=3)
 
 
+class DesktopWindowAPI:
+    """Only expose known display pages and controls for this native window."""
+
+    def __init__(self, displays):
+        self._displays = displays
+        self._window = None
+
+    def open_display(self, path):
+        return self._displays.open_display(path)
+
+    def toggle_fullscreen(self):
+        self._window.toggle_fullscreen()
+        return True
+
+
+class DisplayWindows:
+    def __init__(self, server_url):
+        self._server_url = server_url
+        self._windows = []
+
+    def open_display(self, path):
+        titles = {"/billboard": "RF Billboard", "/design-billboard": "Vote Showcase"}
+        if path not in titles:
+            raise ValueError("Unknown display screen.")
+        import webview
+
+        api = DesktopWindowAPI(self)
+        window = webview.create_window(
+            "Tinfoil Hat — " + titles[path],
+            self._server_url + path,
+            js_api=api,
+            width=1280,
+            height=900,
+            resizable=True,
+        )
+        api._window = window
+        self._windows.append(window)
+
+        def forget_window():
+            if window in self._windows:
+                self._windows.remove(window)
+
+        window.events.closed += forget_window
+        return True
+
+
 def smoke_check(server):
     """Validate packaged templates, assets, database writes, and readback."""
     from urllib.parse import urlencode
@@ -141,7 +187,12 @@ def main(argv=None):
         if not args.smoke_test:
             import webview
 
-            window = webview.create_window("Tinfoil Hat Competition", server.url, width=1280, height=900)
+            displays = DisplayWindows(server.url)
+            window_api = DesktopWindowAPI(displays)
+            window = webview.create_window(
+                "Tinfoil Hat Competition", server.url, width=1280, height=900, js_api=window_api
+            )
+            window_api._window = window
             gui_errors = []
 
             def check_window():
@@ -219,9 +270,51 @@ def main(argv=None):
                         time.sleep(0.1)
                     else:
                         raise RuntimeError("The Admin HackRF check did not finish in the desktop window.")
+                    for path in ("/billboard", "/design-billboard"):
+                        window.evaluate_js(f"document.querySelector('a[href={json.dumps(path)}]').click()")
+                        deadline = time.monotonic() + 20
+                        while not displays._windows and time.monotonic() < deadline:
+                            time.sleep(0.1)
+                        if not displays._windows:
+                            raise RuntimeError(f"Clicking {path} did not open a separate native window.")
+                        child = displays._windows[-1]
+                        try:
+                            if not child.events.loaded.wait(timeout=30):
+                                raise RuntimeError("The display window did not load.")
+                            if not child.evaluate_js(f"location.pathname === {json.dumps(path)}"):
+                                raise RuntimeError("The display window opened the wrong page.")
+                            wait_for_page("/admin")
+                            child.move(80, 80)
+                            child.evaluate_js("document.getElementById('display-fullscreen').click()")
+                            deadline = time.monotonic() + 10
+                            while time.monotonic() < deadline:
+                                if child.evaluate_js(
+                                    "document.getElementById('display-fullscreen')"
+                                    ".getAttribute('aria-pressed') === 'true'"
+                                ):
+                                    break
+                                time.sleep(0.1)
+                            else:
+                                raise RuntimeError("The display fullscreen button did not work.")
+                            child.evaluate_js("document.dispatchEvent(new KeyboardEvent('keydown', {key: 'Escape'}))")
+                            deadline = time.monotonic() + 10
+                            while time.monotonic() < deadline:
+                                if child.evaluate_js(
+                                    "document.getElementById('display-fullscreen')"
+                                    ".getAttribute('aria-pressed') === 'false'"
+                                ):
+                                    break
+                                time.sleep(0.1)
+                            else:
+                                raise RuntimeError("The display window did not exit fullscreen.")
+                        finally:
+                            child.destroy()
+                            displays._windows.clear()
                 except Exception as error:
                     gui_errors.append(error)
                 finally:
+                    for child in displays._windows:
+                        child.destroy()
                     window.destroy()
 
             webview.start(

@@ -3,6 +3,9 @@
     <a id="back-to-admin" class="screen-navigation__back" href="{{ url_for('tinfoilhat.admin') }}" title="Back to Admin (Alt+Left or Backspace)">
         <span aria-hidden="true">&#8592;</span> Back to Admin
     </a>
+    {% if config.get('DESKTOP_MODE') %}
+    <button id="display-fullscreen" class="screen-navigation__back" type="button" aria-pressed="false" title="Toggle full screen (F11; Escape to exit)">Full screen</button>
+    {% endif %}
     <details class="screen-navigation__menu">
         <summary>Screens <span aria-hidden="true">&#9662;</span></summary>
         <div class="screen-navigation__links">

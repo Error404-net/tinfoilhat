@@ -3,6 +3,7 @@
 import io
 import json
 import sqlite3
+from unittest.mock import MagicMock, patch
 from urllib.error import URLError
 from urllib.request import urlopen
 
@@ -11,7 +12,7 @@ import pytest
 pytest.importorskip("waitress")
 pytest.importorskip("platformdirs")
 
-from tinfoilhat.desktop import DesktopServer, desktop_app
+from tinfoilhat.desktop import DesktopServer, DesktopWindowAPI, DisplayWindows, desktop_app
 
 
 def test_competition_survives_restart(tmp_path):
@@ -77,3 +78,25 @@ def test_desktop_kiosk_links_stay_in_application_window(tmp_path):
     assert b'href="/vote" target="_self"' in response.data
     assert b'href="/billboard" target="_self"' in response.data
     assert b'href="/design-billboard" target="_self"' in response.data
+    assert b"js/desktop-navigation.js" in response.data
+
+
+def test_display_windows_only_open_known_local_pages():
+    displays = DisplayWindows("http://127.0.0.1:12345")
+    with patch("webview.create_window") as create:
+        with pytest.raises(ValueError):
+            displays.open_display("https://example.com")
+        create.assert_not_called()
+        assert displays.open_display("/billboard")
+        assert create.call_args.args[1] == "http://127.0.0.1:12345/billboard"
+        assert create.call_args.kwargs["resizable"]
+        api = create.call_args.kwargs["js_api"]
+        api.toggle_fullscreen()
+        create.return_value.toggle_fullscreen.assert_called_once()
+
+
+def test_native_fullscreen_targets_own_window():
+    api = DesktopWindowAPI(MagicMock())
+    api._window = MagicMock()
+    assert api.toggle_fullscreen()
+    api._window.toggle_fullscreen.assert_called_once()

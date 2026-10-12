@@ -108,6 +108,9 @@
             filter: brightness(0) saturate(100%) invert(100%);
         }
     </style>
+    {% if config.get('DESKTOP_MODE') and not embed %}
+    <script src="{{ url_for('static', filename='js/desktop-navigation.js') }}" defer></script>
+    {% endif %}
 </head>
 <body>
     <div class="rf-card">
