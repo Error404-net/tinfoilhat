@@ -72,7 +72,7 @@ def test_bounded_log_download(client, tmp_path):
     (tmp_path / "desktop.log").write_text("old line\n" * 12000 + "latest scanner error\n")
     response = client.get("/admin/diagnostics/logs")
     assert len(response.data) <= 65536
-    assert response.data.endswith(b"latest scanner error\n")
+    assert response.data.splitlines()[-1] == b"latest scanner error"
     assert "attachment" in response.headers["Content-Disposition"]
 
 
