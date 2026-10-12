@@ -192,6 +192,7 @@ def main(argv=None):
         if not args.smoke_test:
             import webview
 
+            webview.settings["ALLOW_DOWNLOADS"] = True
             displays = DisplayWindows(server.url)
             window_api = DesktopWindowAPI(displays)
             window = webview.create_window(
