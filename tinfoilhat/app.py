@@ -12,7 +12,6 @@ from contextlib import suppress
 from flask import Flask, send_from_directory
 
 from tinfoilhat import routes
-from tinfoilhat.diagnostics import init_diagnostics
 from tinfoilhat.db import (
     close_db,
     ensure_class_table_exists,
@@ -25,6 +24,7 @@ from tinfoilhat.db import (
     get_db,
     init_db,
 )
+from tinfoilhat.diagnostics import init_diagnostics
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
 logger = logging.getLogger(__name__)

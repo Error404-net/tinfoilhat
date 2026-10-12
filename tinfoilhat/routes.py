@@ -15,8 +15,6 @@ import traceback
 import zipfile
 from datetime import datetime
 
-from werkzeug.utils import secure_filename
-
 from flask import (
     Blueprint,
     Response,
@@ -29,6 +27,7 @@ from flask import (
     stream_with_context,
     url_for,
 )
+from werkzeug.utils import secure_filename
 
 from tinfoilhat.db import get_db
 from tinfoilhat.scanner import Scanner
@@ -48,6 +47,7 @@ def _save_photo(file, contestant_id):
     filename = secure_filename(f"contestant_{contestant_id}.{ext}")
     file.save(os.path.join(current_app.config["UPLOAD_FOLDER"], filename))
     return f"uploads/{filename}"
+
 
 # Instead of creating the scanner at module level, create it for each request
 # This will prevent issues when Flask reloads the application
@@ -365,7 +365,7 @@ def get_leaderboard():
     all_rows = db.execute(query, params).fetchall()
     total = len(all_rows)
     offset = (page - 1) * per_page
-    rows = all_rows[offset: offset + per_page]
+    rows = all_rows[offset : offset + per_page]
 
     leaderboard_data = [
         {
@@ -1408,15 +1408,13 @@ def billboard():
     db = get_db()
 
     # Get most recent test result
-    recent_test = db.execute(
-        """
+    recent_test = db.execute("""
         SELECT t.id as max_id, c.name, t.hat_type, ROUND(t.average_attenuation, 2) as attenuation,
                t.test_date as date
         FROM test_result t
         JOIN contestant c ON t.contestant_id = c.id
         WHERE t.id = (SELECT MAX(id) FROM test_result)
-    """
-    ).fetchone()
+    """).fetchone()
 
     # Get leaderboard data
     leaderboard_classic = get_leaderboard_data("classic")
@@ -2021,7 +2019,13 @@ def add_contestant_admin():
         class_id = data.get("class_id") or None
         cursor = db.execute(
             "INSERT INTO contestant (name, phone_number, email, notes, class_id) VALUES (?, ?, ?, ?, ?)",
-            (data.get("name", ""), data.get("phone_number", ""), data.get("email", ""), data.get("notes", ""), class_id),
+            (
+                data.get("name", ""),
+                data.get("phone_number", ""),
+                data.get("email", ""),
+                data.get("notes", ""),
+                class_id,
+            ),
         )
         db.commit()
         new_id = cursor.lastrowid
@@ -2052,7 +2056,14 @@ def update_contestant_admin(contestant_id):
         class_id = data.get("class_id") or None
         db.execute(
             "UPDATE contestant SET name = ?, phone_number = ?, email = ?, notes = ?, class_id = ? WHERE id = ?",
-            (data.get("name", ""), data.get("phone_number", ""), data.get("email", ""), data.get("notes", ""), class_id, contestant_id),
+            (
+                data.get("name", ""),
+                data.get("phone_number", ""),
+                data.get("email", ""),
+                data.get("notes", ""),
+                class_id,
+                contestant_id,
+            ),
         )
         db.commit()
         photo_path = _save_photo(request.files.get("photo"), contestant_id)
@@ -2069,7 +2080,12 @@ def update_contestant_admin(contestant_id):
 def list_classes():
     db = get_db()
     rows = db.execute("SELECT id, name, description, is_team FROM class ORDER BY name").fetchall()
-    return jsonify([{"id": r["id"], "name": r["name"], "description": r["description"], "is_team": bool(r["is_team"])} for r in rows])
+    return jsonify(
+        [
+            {"id": r["id"], "name": r["name"], "description": r["description"], "is_team": bool(r["is_team"])}
+            for r in rows
+        ]
+    )
 
 
 @bp.route("/admin/classes", methods=["POST"])
@@ -2504,6 +2520,7 @@ def force_reset_all_displays():
     print(f"Emergency reset sent to {reset_sent_count} clients successfully")
     return reset_sent_count
 
+
 @bp.route("/rules")
 def rules():
     """
@@ -2514,6 +2531,7 @@ def rules():
     """
     return render_template("rules_flyer.html")
 
+
 @bp.route("/prizes")
 def prizes():
     """
@@ -2523,6 +2541,7 @@ def prizes():
     :rtype: str
     """
     return render_template("prizes_flyer.html")
+
 
 @bp.route("/rf_attenuation")
 def rf_attenuation():
@@ -2572,7 +2591,13 @@ def save_billboard_config():
     """Save billboard section visibility config."""
     db = get_db()
     data = request.get_json()
-    keys = ["billboard_show_classic", "billboard_show_hybrid", "billboard_show_spectrum", "billboard_show_votes", "billboard_vote_show_labels"]
+    keys = [
+        "billboard_show_classic",
+        "billboard_show_hybrid",
+        "billboard_show_spectrum",
+        "billboard_show_votes",
+        "billboard_vote_show_labels",
+    ]
     for k in keys:
         db.execute("INSERT OR REPLACE INTO settings (key, value) VALUES (?, ?)", (k, "1" if data.get(k) else "0"))
     db.commit()
@@ -2591,7 +2616,9 @@ def get_top_voted():
         ORDER BY vote_count DESC, c.name
         LIMIT 8
     """).fetchall()
-    return jsonify([{"id": r["id"], "name": r["name"], "photo_path": r["photo_path"], "vote_count": r["vote_count"]} for r in rows])
+    return jsonify(
+        [{"id": r["id"], "name": r["name"], "photo_path": r["photo_path"], "vote_count": r["vote_count"]} for r in rows]
+    )
 
 
 @bp.route("/design-billboard")
@@ -2622,9 +2649,7 @@ def vote_page():
     where = "WHERE c.class_id = ?" if class_id else ""
     params = [class_id] if class_id else []
 
-    total = db.execute(
-        f"SELECT COUNT(*) AS n FROM contestant c {where}", params
-    ).fetchone()["n"]
+    total = db.execute(f"SELECT COUNT(*) AS n FROM contestant c {where}", params).fetchone()["n"]
 
     contestants = db.execute(
         f"""
@@ -2670,8 +2695,7 @@ def cast_vote(contestant_id):
 def admin_votes():
     """Return vote tallies as JSON for the admin voting tab."""
     db = get_db()
-    rows = db.execute(
-        """
+    rows = db.execute("""
         SELECT c.id, c.name, c.photo_path,
                COUNT(v.id) AS vote_count,
                MAX(v.created) AS last_vote
@@ -2679,8 +2703,7 @@ def admin_votes():
         LEFT JOIN votes v ON v.contestant_id = c.id
         GROUP BY c.id
         ORDER BY vote_count DESC, c.name
-        """
-    ).fetchall()
+        """).fetchall()
     return jsonify(
         [
             {
@@ -2699,8 +2722,7 @@ def admin_votes():
 def export_csv():
     """Export all contestants + best score + vote count as CSV."""
     db = get_db()
-    rows = db.execute(
-        """
+    rows = db.execute("""
         SELECT
             c.id, c.name, c.phone_number, c.email, c.notes, c.photo_path, c.created,
             cl.name AS class_name, cl.is_team,
@@ -2714,23 +2736,46 @@ def export_csv():
         LEFT JOIN votes v ON v.contestant_id = c.id
         GROUP BY c.id
         ORDER BY c.name
-        """
-    ).fetchall()
+        """).fetchall()
 
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
-        ["id", "name", "class", "is_team", "phone_number", "email", "notes", "created",
-         "best_attenuation_dB", "hat_type", "test_date", "vote_count", "photo_url"]
+        [
+            "id",
+            "name",
+            "class",
+            "is_team",
+            "phone_number",
+            "email",
+            "notes",
+            "created",
+            "best_attenuation_dB",
+            "hat_type",
+            "test_date",
+            "vote_count",
+            "photo_url",
+        ]
     )
     base = request.host_url.rstrip("/")
     for r in rows:
         photo_url = f"{base}/static/{r['photo_path']}" if r["photo_path"] else ""
         writer.writerow(
-            [r["id"], r["name"], r["class_name"] or "", r["is_team"] or 0,
-             r["phone_number"], r["email"], r["notes"],
-             r["created"], r["best_attenuation"], r["hat_type"], r["test_date"],
-             r["vote_count"], photo_url]
+            [
+                r["id"],
+                r["name"],
+                r["class_name"] or "",
+                r["is_team"] or 0,
+                r["phone_number"],
+                r["email"],
+                r["notes"],
+                r["created"],
+                r["best_attenuation"],
+                r["hat_type"],
+                r["test_date"],
+                r["vote_count"],
+                photo_url,
+            ]
         )
 
     output = buf.getvalue()
@@ -2745,8 +2790,7 @@ def export_csv():
 def export_test_results_csv():
     """Export all test results (one row per frequency measurement) as CSV."""
     db = get_db()
-    rows = db.execute(
-        """
+    rows = db.execute("""
         SELECT
             tr.id AS result_id, c.name AS contestant_name,
             tr.test_date, tr.average_attenuation, tr.is_best_score, tr.hat_type,
@@ -2755,21 +2799,39 @@ def export_test_results_csv():
         JOIN contestant c ON c.id = tr.contestant_id
         LEFT JOIN test_data td ON td.test_result_id = tr.id
         ORDER BY tr.test_date DESC, tr.id, td.frequency
-        """
-    ).fetchall()
+        """).fetchall()
 
     buf = io.StringIO()
     writer = csv.writer(buf)
     writer.writerow(
-        ["result_id", "contestant_name", "test_date", "average_attenuation_dB",
-         "is_best_score", "hat_type", "frequency_MHz", "baseline_dBm", "hat_dBm", "attenuation_dB"]
+        [
+            "result_id",
+            "contestant_name",
+            "test_date",
+            "average_attenuation_dB",
+            "is_best_score",
+            "hat_type",
+            "frequency_MHz",
+            "baseline_dBm",
+            "hat_dBm",
+            "attenuation_dB",
+        ]
     )
     for r in rows:
-        writer.writerow([
-            r["result_id"], r["contestant_name"], r["test_date"],
-            r["average_attenuation"], r["is_best_score"], r["hat_type"],
-            r["frequency"], r["baseline_level"], r["hat_level"], r["attenuation"],
-        ])
+        writer.writerow(
+            [
+                r["result_id"],
+                r["contestant_name"],
+                r["test_date"],
+                r["average_attenuation"],
+                r["is_best_score"],
+                r["hat_type"],
+                r["frequency"],
+                r["baseline_level"],
+                r["hat_level"],
+                r["attenuation"],
+            ]
+        )
 
     return Response(
         buf.getvalue(),

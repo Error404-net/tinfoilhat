@@ -2,8 +2,6 @@ name: Attach Windows installer to draft release
 
 on:
   workflow_dispatch:
-  push:
-    branches: ['desktop/windows-release-*']
 
 permissions:
   contents: write

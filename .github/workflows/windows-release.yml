@@ -84,11 +84,26 @@ jobs:
         with:
           name: TinfoilHat-Windows-x64
           path: dist
-      - name: Create draft release
+      - name: Publish verified Windows release
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
+          set -euo pipefail
+          (cd dist && sha256sum -c SHA256SUMS.txt)
+          if gh release view "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+            --json isDraft,assets > /tmp/existing-release.json; then
+            if jq -e '.isDraft == false' /tmp/existing-release.json; then
+              # Published installers are immutable; reruns never replace them.
+              jq -e '[.assets[].name] | index("TinfoilHat-Setup-x64.exe") != null and index("SHA256SUMS.txt") != null' \
+                /tmp/existing-release.json
+              echo "This release is already published with its installer and checksum."
+              exit 0
+            fi
+            gh release upload "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" --clobber
+            gh release edit "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --draft=false
+            exit 0
+          fi
           gh release create "$RELEASE_TAG" dist/* --repo "$GITHUB_REPOSITORY" \
-            --draft --verify-tag --title "Tinfoil Hat $RELEASE_TAG (Windows)" \
+            --verify-tag --title "Tinfoil Hat $RELEASE_TAG (Windows)" \
             --notes "Windows x64 installer with bundled Python, application libraries, HackRF tools, and the Microsoft WebView2 offline runtime installer. A HackRF One and a compatible WinUSB driver are required for RF measurements."

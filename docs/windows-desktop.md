@@ -58,8 +58,12 @@ Windows executables must be built on Windows; PyInstaller does not cross-compile
 from Linux. The repository's **Windows desktop release** GitHub Actions workflow
 builds the installer and runs tests against both its packaged backend and native
 window. Run it manually to download the `TinfoilHat-Windows-x64` artifact.
-Pushing a `v*` tag also creates a **draft** GitHub Release after successful checks.
-Review that draft before publishing it.
+Pushing a new `v*` version tag publishes a GitHub Release after all Windows build,
+installer, and native-window checks pass. The release includes the installer and
+`SHA256SUMS.txt`. Failed builds publish nothing, and reruns never replace files
+in an already published release. Manual builds produce downloadable artifacts.
+Use a new version tag for each update; GitHub Releases distributes the Windows
+installer directly, so a GitHub Packages registry is not required.
 
 For a local build, install x64 Python 3.13, NSIS, and micromamba, then run:
 
