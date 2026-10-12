@@ -16,14 +16,22 @@ document.addEventListener('click', async event => {
 
 async function toggleDisplayFullscreen() {
     if (!window.pywebview?.api) return;
-    await window.pywebview.api.toggle_fullscreen();
-    displayFullscreen = !displayFullscreen;
+    displayFullscreen = await window.pywebview.api.toggle_fullscreen();
+    updateFullscreenButton();
+}
+
+function updateFullscreenButton() {
     const button = document.getElementById('display-fullscreen');
     if (button) {
         button.textContent = displayFullscreen ? 'Exit full screen' : 'Full screen';
         button.setAttribute('aria-pressed', String(displayFullscreen));
     }
 }
+
+window.addEventListener('pywebviewready', async () => {
+    displayFullscreen = await window.pywebview.api.get_fullscreen();
+    updateFullscreenButton();
+});
 
 document.addEventListener('click', event => {
     if (event.target.closest('#display-fullscreen')) toggleDisplayFullscreen();

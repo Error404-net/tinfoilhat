@@ -92,13 +92,18 @@ class DesktopWindowAPI:
     def __init__(self, displays):
         self._displays = displays
         self._window = None
+        self._fullscreen = False
 
     def open_display(self, path):
         return self._displays.open_display(path)
 
     def toggle_fullscreen(self):
         self._window.toggle_fullscreen()
-        return True
+        self._fullscreen = not self._fullscreen
+        return self._fullscreen
+
+    def get_fullscreen(self):
+        return self._fullscreen
 
 
 class DisplayWindows:
