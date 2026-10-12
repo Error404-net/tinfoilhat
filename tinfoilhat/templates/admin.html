@@ -363,6 +363,7 @@
             <button class="tablinks"        role="tab" aria-selected="false" aria-controls="billboard-settings" onclick="openTab(event, 'billboard-settings')">Billboard</button>
             <button class="tablinks"        role="tab" aria-selected="false" aria-controls="voting"            onclick="openTab(event, 'voting'); loadVotes()">Voting</button>
             <button class="tablinks"        role="tab" aria-selected="false" aria-controls="classes"           onclick="openTab(event, 'classes')">Classes</button>
+            <button class="tablinks" role="tab" aria-selected="false" aria-controls="diagnostics" onclick="openTab(event, 'diagnostics'); loadDiagnostics()">Diagnostics</button>
         </div>
 
         <div id="contestants" class="tabcontent" style="display: block;">
@@ -601,6 +602,23 @@
                     {% endfor %}
                 </tbody>
             </table>
+        </div>
+
+        <div id="diagnostics" class="tabcontent">
+            <h2>Diagnostics</h2>
+            <p>Check application dependencies, HackRF detection, and recent application logs.</p>
+            <p><button id="diagnostics-refresh" type="button">Refresh status and logs</button>
+               <button id="diagnostics-check" type="button">Check HackRF</button>
+               <a href="{{ url_for('diagnostics.download_logs') }}">Download recent logs</a></p>
+            <p>Stop RF measurements before checking the device. This check opens the device without taking a measurement.</p>
+            <p id="diagnostics-message" role="status" aria-live="polite"></p>
+            <div id="diagnostics-status"></div>
+            <h3>HackRF check</h3>
+            <p id="diagnostics-device">No check has been run yet.</p>
+            <pre id="diagnostics-output" style="white-space:pre-wrap; overflow-wrap:anywhere; max-height:250px; overflow:auto;"></pre>
+            <h3>Recent logs</h3>
+            <p id="diagnostics-log-path"></p>
+            <pre id="diagnostics-logs" style="white-space:pre-wrap; overflow-wrap:anywhere; max-height:400px; overflow:auto;"></pre>
         </div>
 
         <!-- Add Class Modal -->
@@ -1188,6 +1206,7 @@
                 }, 300); // Wait 300ms after user stops typing
             });
         </script>
+        <script src="{{ url_for('static', filename='js/diagnostics.js') }}"></script>
     </div>
 </body>
 </html>

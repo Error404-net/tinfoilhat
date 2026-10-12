@@ -45,6 +45,7 @@ def desktop_app(data_dir):
             "UPLOAD_FOLDER": str(data_dir / "uploads"),
             "SECRET_KEY": key_path.read_text(encoding="utf-8"),
             "DESKTOP_MODE": True,
+            "DESKTOP_LOG": str(data_dir / "desktop.log"),
         },
         instance_path=str(data_dir),
     )
@@ -191,6 +192,33 @@ def main(argv=None):
                         key: 'Backspace', bubbles: true, cancelable: true
                     }))""")
                     wait_for_page("/admin")
+                    window.resize(1280, 900)
+                    window.evaluate_js("document.querySelector('[aria-controls=diagnostics]').click()")
+                    deadline = time.monotonic() + 20
+                    while time.monotonic() < deadline:
+                        if window.evaluate_js(
+                            "document.getElementById('diagnostics-message').textContent === 'Diagnostics updated.'"
+                        ):
+                            break
+                        time.sleep(0.1)
+                    else:
+                        raise RuntimeError("Admin diagnostics did not load in the desktop window.")
+                    if not window.evaluate_js(
+                        "document.getElementById('diagnostics-status').textContent.includes('hackrf_info:') && "
+                        "document.getElementById('diagnostics-status').textContent.includes('pywebview:')"
+                    ):
+                        raise RuntimeError("Admin diagnostics did not display desktop dependencies and HackRF tools.")
+                    window.evaluate_js("document.getElementById('diagnostics-check').click()")
+                    deadline = time.monotonic() + 20
+                    while time.monotonic() < deadline:
+                        if window.evaluate_js(
+                            "document.getElementById('diagnostics-message').textContent === 'Diagnostics updated.' && "
+                            "document.getElementById('diagnostics-device').textContent.includes('Checked:')"
+                        ):
+                            break
+                        time.sleep(0.1)
+                    else:
+                        raise RuntimeError("The Admin HackRF check did not finish in the desktop window.")
                 except Exception as error:
                     gui_errors.append(error)
                 finally:

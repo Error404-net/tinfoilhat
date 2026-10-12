@@ -12,6 +12,7 @@ from contextlib import suppress
 from flask import Flask, send_from_directory
 
 from tinfoilhat import routes
+from tinfoilhat.diagnostics import init_diagnostics
 from tinfoilhat.db import (
     close_db,
     ensure_class_table_exists,
@@ -55,6 +56,8 @@ def create_app(test_config=None, *, instance_path=None):
     else:
         # Load the test config if passed in
         app.config.from_mapping(test_config)
+
+    init_diagnostics(app)
 
     os.makedirs(app.config["UPLOAD_FOLDER"], exist_ok=True)
 

@@ -5,12 +5,15 @@ This module handles communication with the HackRF One device and processes
 signal measurements.
 """
 
+import logging
 import os
 import subprocess
 import tempfile
 import time
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 class Scanner:
@@ -159,21 +162,21 @@ class Scanner:
         self.frequencies = sorted(self.selected_frequencies)
 
         # Log the frequency points we'll test
-        print(f"Will test the following frequencies (MHz): {self.frequencies}")
-        print(f"Frequency labels: {self.frequency_labels}")
+        logger.info(f"Will test the following frequencies (MHz): {self.frequencies}")
+        logger.info(f"Frequency labels: {self.frequency_labels}")
 
         # Verify HackRF presence
         self.hackrf_available = self._check_hackrf()
         if not self.hackrf_available:
-            print("⚠️  HackRF One not detected or not connected properly.")
-            print("Please ensure HackRF tools are installed and device is connected.")
-            print("You can run python check_hackrf.py for detailed diagnostics.")
+            logger.info("⚠️  HackRF One not detected or not connected properly.")
+            logger.info("Please ensure HackRF tools are installed and device is connected.")
+            logger.info("You can run python check_hackrf.py for detailed diagnostics.")
             # Don't exit - this allows the application to initialize without a HackRF
             # and possibly recover later if the device becomes available
 
         # Create a temp directory for our files
         self.temp_dir = tempfile.mkdtemp(prefix="hackrf_")
-        print(f"Using temporary directory: {self.temp_dir}")
+        logger.info(f"Using temporary directory: {self.temp_dir}")
 
     def __del__(self):
         """Clean up temporary directory when object is destroyed"""
@@ -182,9 +185,9 @@ class Scanner:
                 import shutil
 
                 shutil.rmtree(self.temp_dir)
-                print(f"Removed temporary directory: {self.temp_dir}")
+                logger.info(f"Removed temporary directory: {self.temp_dir}")
         except Exception as e:
-            print(f"Error cleaning up: {str(e)}")
+            logger.info(f"Error cleaning up: {str(e)}")
 
     def _check_hackrf(self) -> bool:
         """
@@ -206,46 +209,48 @@ class Scanner:
                 )
 
                 if "HackRF One" in result.stdout:
-                    print("HackRF One detected successfully")
+                    logger.info("HackRF One detected successfully")
 
                     # Extract serial number
                     serial = None
                     for line in result.stdout.splitlines():
                         if "Serial number:" in line:
                             serial = line.split(":")[-1].strip()
-                            print(f"Using HackRF with serial: {serial}")
+                            logger.info(f"Using HackRF with serial: {serial}")
 
                     return True
                 else:
-                    print(f"WARNING: HackRF One not detected on attempt {attempt}/3. Retrying...")
+                    logger.info(f"WARNING: HackRF One not detected on attempt {attempt}/3. Retrying...")
                     if attempt < 3:
                         time.sleep(1)  # Wait before retrying
                     else:
-                        print(
+                        logger.info(
                             "WARNING: HackRF One not detected after multiple attempts. "
                             "Make sure the device is connected."
                         )
                         return False
             except FileNotFoundError:
-                print("ERROR: hackrf_info command not found. Please ensure HackRF tools are installed.")
-                print("Install instructions: https://github.com/greatscottgadgets/hackrf/wiki/Operating-System-Tips")
+                logger.info("ERROR: hackrf_info command not found. Please ensure HackRF tools are installed.")
+                logger.info(
+                    "Install instructions: https://github.com/greatscottgadgets/hackrf/wiki/Operating-System-Tips"
+                )
                 return False
             except subprocess.TimeoutExpired:
-                print(f"ERROR: hackrf_info command timed out on attempt {attempt}/3.")
+                logger.info(f"ERROR: hackrf_info command timed out on attempt {attempt}/3.")
                 if attempt < 3:
-                    print("   Retrying after timeout...")
+                    logger.info("   Retrying after timeout...")
                     time.sleep(1)  # Wait before retrying
                 else:
-                    print("ERROR: hackrf_info command timed out after multiple attempts.")
-                    print("The device might be busy or unresponsive.")
-                    print("Try disconnecting and reconnecting the HackRF device.")
+                    logger.info("ERROR: hackrf_info command timed out after multiple attempts.")
+                    logger.info("The device might be busy or unresponsive.")
+                    logger.info("Try disconnecting and reconnecting the HackRF device.")
                     return False
             except Exception as e:
-                print(f"ERROR checking HackRF on attempt {attempt}/3: {str(e)}")
+                logger.info(f"ERROR checking HackRF on attempt {attempt}/3: {str(e)}")
                 if attempt < 3:
                     time.sleep(1)  # Wait before retrying
                 else:
-                    print(f"ERROR checking HackRF after multiple attempts: {str(e)}")
+                    logger.info(f"ERROR checking HackRF after multiple attempts: {str(e)}")
                     return False
 
         return False  # Should not reach here but just in case
@@ -258,7 +263,7 @@ class Scanner:
         :return: True if HackRF is available after refresh, False otherwise
         :rtype: bool
         """
-        print("Refreshing HackRF connection...")
+        logger.info("Refreshing HackRF connection...")
         self.hackrf_available = self._check_hackrf()
         return self.hackrf_available
 
@@ -273,7 +278,7 @@ class Scanner:
         """
         # Check if we have enough samples
         if len(samples) < 8:  # Need at least a few I/Q pairs
-            print("Warning: Not enough samples for analysis")
+            logger.info("Warning: Not enough samples for analysis")
             return -80  # Return a reasonable fallback value
 
         # Convert bytes to 8-bit signed integers
@@ -321,7 +326,7 @@ class Scanner:
         """
         # Make sure HackRF is available
         if not self.hackrf_available:
-            print("HackRF not available during measurement. Attempting to refresh connection...")
+            logger.info("HackRF not available during measurement. Attempting to refresh connection...")
             if not self.refresh_hackrf():
                 raise RuntimeError(
                     f"HackRF device is not available and reconnection failed. Cannot measure at {freq_hz / 1e6} MHz."
@@ -387,7 +392,7 @@ class Scanner:
 
         try:
             # Run the command with a timeout
-            print(f"Measuring at {freq_mhz} MHz with LNA gain {lna_gain} dB, VGA gain {vga_gain} dB")
+            logger.info(f"Measuring at {freq_mhz} MHz with LNA gain {lna_gain} dB, VGA gain {vga_gain} dB")
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -400,18 +405,18 @@ class Scanner:
                 error_msg = f"Error measuring frequency {freq_mhz} MHz: return code {result.returncode}"
                 if result.stderr:
                     error_msg += f"\nError output: {result.stderr}"
-                print(error_msg)
+                logger.info(error_msg)
                 raise RuntimeError(error_msg)
 
             # Check if the output file exists and has data
             if not os.path.exists(output_file):
                 error_msg = f"No output file created for frequency {freq_mhz} MHz"
-                print(error_msg)
+                logger.info(error_msg)
                 raise RuntimeError(error_msg)
 
             if os.path.getsize(output_file) == 0:
                 error_msg = f"No data captured for frequency {freq_mhz} MHz (empty file)"
-                print(error_msg)
+                logger.info(error_msg)
                 raise RuntimeError(error_msg)
 
             # Read the IQ samples from the file
@@ -422,7 +427,7 @@ class Scanner:
             try:
                 os.remove(output_file)
             except Exception as e:
-                print(f"Warning: Failed to remove temporary file {output_file}: {str(e)}")
+                logger.info(f"Warning: Failed to remove temporary file {output_file}: {str(e)}")
 
             # Analyze the samples
             power = self._analyze_iq_samples(samples)
@@ -432,12 +437,12 @@ class Scanner:
             freq_adjustment = -0.01 * (freq_mhz / 10)  # -0.1 dB per 100 MHz
             power += freq_adjustment
 
-            print(f"Measured power at {freq_mhz} MHz: {power:.2f} dBm")
+            logger.info(f"Measured power at {freq_mhz} MHz: {power:.2f} dBm")
             return power
 
         except subprocess.TimeoutExpired:
             error_msg = f"Timeout measuring frequency {freq_mhz} MHz"
-            print(error_msg)
+            logger.info(error_msg)
             # Check if HackRF is still available after timeout
             if not self.refresh_hackrf():
                 raise RuntimeError(f"HackRF connection lost during timeout at {freq_mhz} MHz")
@@ -448,10 +453,10 @@ class Scanner:
 
         except Exception as e:
             error_msg = f"Error measuring frequency {freq_mhz} MHz: {str(e)}"
-            print(error_msg)
+            logger.info(error_msg)
             # Check if this is a HackRF-related error and we should try to reconnect
             if "hackrf" in str(e).lower() or "usb" in str(e).lower():
-                print("Possible HackRF connection issue. Attempting to refresh...")
+                logger.info("Possible HackRF connection issue. Attempting to refresh...")
                 if not self.refresh_hackrf():
                     raise RuntimeError(f"HackRF connection lost during measurement at {freq_mhz} MHz: " f"{str(e)}")
             raise
@@ -464,13 +469,13 @@ class Scanner:
         :rtype: List[float]
         """
         if not self.hackrf_available:
-            print("HackRF not available. Attempting to refresh connection...")
+            logger.info("HackRF not available. Attempting to refresh connection...")
             if not self.refresh_hackrf():
                 raise RuntimeError(
                     "HackRF device is not available and reconnection failed. " "Cannot perform measurements."
                 )
 
-        print("Starting baseline measurements...")
+        logger.info("Starting baseline measurements...")
 
         baseline = []
         for freq in self.frequencies:
@@ -482,14 +487,14 @@ class Scanner:
                     readings.append(reading)
                     time.sleep(0.5)  # Short delay between measurements
                 except Exception as e:
-                    print(f"Error measuring at {freq} MHz (sample {i + 1}/{self.samples_per_freq}): " f"{str(e)}")
+                    logger.info(f"Error measuring at {freq} MHz (sample {i + 1}/{self.samples_per_freq}): " f"{str(e)}")
                     # Try to refresh HackRF connection if we encounter an error
                     if "hackrf" in str(e).lower() or "usb" in str(e).lower():
-                        print("Possible HackRF connection issue detected. " "Attempting to refresh...")
+                        logger.info("Possible HackRF connection issue detected. " "Attempting to refresh...")
                         if self.refresh_hackrf():
-                            print("HackRF connection restored. Retrying measurement...")
+                            logger.info("HackRF connection restored. Retrying measurement...")
                         else:
-                            print("Failed to restore HackRF connection.")
+                            logger.info("Failed to restore HackRF connection.")
                             raise RuntimeError(f"HackRF connection lost during measurement: {str(e)}")
 
             if not readings:
@@ -497,11 +502,11 @@ class Scanner:
 
             # Average the readings
             avg_power = sum(readings) / len(readings)
-            print(f"Average baseline at {freq} MHz: {avg_power:.2f} dBm")
+            logger.info(f"Average baseline at {freq} MHz: {avg_power:.2f} dBm")
             baseline.append(avg_power)
 
-        print("Baseline measurements completed")
-        print(f"Baseline readings: {baseline}")
+        logger.info("Baseline measurements completed")
+        logger.info(f"Baseline readings: {baseline}")
         return baseline
 
     def get_hat_readings(self) -> list[float]:
@@ -512,14 +517,14 @@ class Scanner:
         :rtype: List[float]
         """
         if not self.hackrf_available:
-            print("HackRF not available. Attempting to refresh connection...")
+            logger.info("HackRF not available. Attempting to refresh connection...")
             if not self.refresh_hackrf():
                 raise RuntimeError(
                     "HackRF device is not available and reconnection failed. " "Cannot perform measurements."
                 )
 
-        print("\n========= PLACE TINFOIL HAT ON MANNEQUIN NOW =========")
-        print("Starting hat measurements...")
+        logger.info("\n========= PLACE TINFOIL HAT ON MANNEQUIN NOW =========")
+        logger.info("Starting hat measurements...")
 
         hat_readings = []
         for freq in self.frequencies:
@@ -534,14 +539,14 @@ class Scanner:
                     readings.append(reading)
                     time.sleep(0.5)  # Short delay between measurements
                 except Exception as e:
-                    print(f"Error measuring at {freq} MHz (sample {i + 1}/{self.samples_per_freq}): " f"{str(e)}")
+                    logger.info(f"Error measuring at {freq} MHz (sample {i + 1}/{self.samples_per_freq}): " f"{str(e)}")
                     # Try to refresh HackRF connection if we encounter an error
                     if "hackrf" in str(e).lower() or "usb" in str(e).lower():
-                        print("Possible HackRF connection issue detected. " "Attempting to refresh...")
+                        logger.info("Possible HackRF connection issue detected. " "Attempting to refresh...")
                         if self.refresh_hackrf():
-                            print("HackRF connection restored. Retrying measurement...")
+                            logger.info("HackRF connection restored. Retrying measurement...")
                         else:
-                            print("Failed to restore HackRF connection.")
+                            logger.info("Failed to restore HackRF connection.")
                             raise RuntimeError(f"HackRF connection lost during measurement: {str(e)}")
 
             if not readings:
@@ -549,11 +554,11 @@ class Scanner:
 
             # Average the readings
             avg_power = sum(readings) / len(readings)
-            print(f"Average hat reading at {freq} MHz: {avg_power:.2f} dBm")
+            logger.info(f"Average hat reading at {freq} MHz: {avg_power:.2f} dBm")
             hat_readings.append(avg_power)
 
-        print("Hat measurements completed")
-        print(f"Hat readings: {hat_readings}")
+        logger.info("Hat measurements completed")
+        logger.info(f"Hat readings: {hat_readings}")
         return hat_readings
 
     def calculate_attenuation(self, baseline: list[float], hat_readings: list[float]) -> list[float]:
@@ -567,7 +572,7 @@ class Scanner:
         :return: Attenuation values at each frequency
         :rtype: List[float]
         """
-        print("\n========= CALCULATING ATTENUATION =========")
+        logger.info("\n========= CALCULATING ATTENUATION =========")
 
         # Attenuation is the difference between baseline and hat readings
         # A positive value means the hat reduced the signal (good)
@@ -575,7 +580,7 @@ class Scanner:
 
         # Check for valid readings
         if len(baseline) != len(hat_readings) or len(baseline) == 0:
-            print("ERROR: Invalid readings data. Cannot calculate attenuation.")
+            logger.info("ERROR: Invalid readings data. Cannot calculate attenuation.")
             return [0.1] * len(self.frequencies)
 
         for freq, base, hat in zip(self.frequencies, baseline, hat_readings, strict=False):
@@ -589,7 +594,7 @@ class Scanner:
             if att < 0:
                 # Negative attenuation means the signal got stronger with the hat
                 # This could be due to reflection, resonance, or other RF effects
-                print(
+                logger.info(
                     f"Note: Negative attenuation detected at {freq} MHz: {att:.2f} dB. Signal is stronger with the hat."
                 )
                 # We'll keep the negative value for accurate representation
@@ -608,23 +613,25 @@ class Scanner:
             # Round to one decimal place for cleaner display
             att = round(att, 1)
 
-            print(f"At {freq} MHz: Baseline {base:.2f} dBm, Hat {hat:.2f} dBm, " f"Attenuation {att:.1f} dB")
+            logger.info(f"At {freq} MHz: Baseline {base:.2f} dBm, Hat {hat:.2f} dBm, " f"Attenuation {att:.1f} dB")
             attenuation.append(att)
 
-        print("\n========= ATTENUATION SUMMARY =========")
-        print(f"Frequencies (MHz): {self.frequencies}")
-        print(f"Attenuation (dB): {[round(a, 1) for a in attenuation]}")
+        logger.info("\n========= ATTENUATION SUMMARY =========")
+        logger.info(f"Frequencies (MHz): {self.frequencies}")
+        logger.info(f"Attenuation (dB): {[round(a, 1) for a in attenuation]}")
 
         # Check if hat is effective
         if max(attenuation) < 2.0 and all(a >= 0 for a in attenuation):
-            print("\nWARNING: The hat shows minimal attenuation (<2dB) - " "this might not be an effective RF shield.")
+            logger.info(
+                "\nWARNING: The hat shows minimal attenuation (<2dB) - " "this might not be an effective RF shield."
+            )
         elif any(a < 0 for a in attenuation):
             neg_freqs = [self.frequencies[i] for i, a in enumerate(attenuation) if a < 0]
-            print(f"\nWARNING: The hat shows negative attenuation at frequencies: {neg_freqs} MHz.")
-            print("This means the signal is stronger with the hat than without it at these frequencies.")
+            logger.info(f"\nWARNING: The hat shows negative attenuation at frequencies: {neg_freqs} MHz.")
+            logger.info("This means the signal is stronger with the hat than without it at these frequencies.")
         else:
             peak_attenuation = max(attenuation)
             peak_freq = self.frequencies[attenuation.index(peak_attenuation)]
-            print(f"\nThe hat performs best at {peak_freq} MHz with " f"{peak_attenuation:.1f} dB attenuation")
+            logger.info(f"\nThe hat performs best at {peak_freq} MHz with " f"{peak_attenuation:.1f} dB attenuation")
 
         return attenuation
